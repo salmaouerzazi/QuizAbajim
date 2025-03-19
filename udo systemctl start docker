@@ -1,0 +1,22 @@
+[0;1;32m●[0m docker.service - Docker Application Container Engine
+     Loaded: loaded (/lib/systemd/system/docker.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Wed 2025-01-29 13:48:43 UTC; 57s ago
+TriggeredBy: [0;1;32m●[0m docker.socket
+       Docs: https://docs.docker.com
+   Main PID: 1671098 (dockerd)
+      Tasks: 19
+     Memory: 28.5M
+        CPU: 1.380s
+     CGroup: /system.slice/docker.service
+             └─1671098 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+
+Jan 29 13:48:42 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:42.391240940Z" level=info msg="detected 127.0.0.53 nameserver, assuming systemd-resolved, so using resolv.conf: /run/systemd/resolve/resolv.conf"
+Jan 29 13:48:42 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:42.661916881Z" level=info msg="[graphdriver] using prior storage driver: overlay2"
+Jan 29 13:48:42 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:42.663597418Z" level=info msg="Loading containers: start."
+Jan 29 13:48:43 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:43.614049883Z" level=info msg="Default bridge (docker0) is assigned with an IP address 172.17.0.0/16. Daemon option --bip can be used to set a preferred IP address"
+Jan 29 13:48:43 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:43.881488004Z" level=info msg="Loading containers: done."
+Jan 29 13:48:43 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:43.906368555Z" level=info msg="Docker daemon" commit=4c9b3b0 containerd-snapshotter=false storage-driver=overlay2 version=27.5.1
+Jan 29 13:48:43 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:43.906541743Z" level=info msg="Daemon has completed initialization"
+Jan 29 13:48:43 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:48:43.996333736Z" level=info msg="API listen on /run/docker.sock"
+Jan 29 13:48:43 8sW7CbLm systemd[1]: Started Docker Application Container Engine.
+Jan 29 13:49:29 8sW7CbLm dockerd[1671098]: time="2025-01-29T13:49:29.505368713Z" level=info msg="ignoring event" container=e3be8f0ab88cf3ac049a3a9980d606456606af7b8958ea02bc2f712d2962431d module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"

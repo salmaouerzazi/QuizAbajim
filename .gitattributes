@@ -1,0 +1,9 @@
+* text=auto
+*.css linguist-vendored
+*.scss linguist-vendored
+*.js linguist-vendored
+# Force LF endings for specific files
+*.blade.php text eol=lf
+*.php text eol=lf
+*.blade.php text eol=lf
+CHANGELOG.md export-ignore

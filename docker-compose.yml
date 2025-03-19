@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Service PHP avec Laravel
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amelgm/abajim-volumes:v5
+    command: /bin/bash -c "echo 'ServerName localhost' >> /etc/apache2/apache2.conf && apache2-foreground"
+    restart: always
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/var/www/Abajim
+    depends_on:
+      - db
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: Abajim
+      DB_USERNAME: abajim
+      DB_PASSWORD: 24102023@Abajim
+    networks:
+      - laravel
+
+  # Service MySQL
+  db:
+    image: mysql:5.7
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: Abajim
+      MYSQL_ROOT_PASSWORD: root
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'      # Limite à 50% d'un CPU
+          memory: '1G'     # Limite à 1 Go de RAM
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - laravel
+
+  # Optionnel: Service phpMyAdmin pour la gestion de la base de données
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+      - "8002:80"
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: root
+    networks:
+      - laravel
+    depends_on:
+      - db
+
+networks:
+  laravel:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+
