@@ -98,6 +98,10 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
 
         // ------ Quiz routes ----------------------------
         Route::get('/quizzes', 'QuizController@indexQuiz')->name('panel.teacher.quiz');
+        // Traitement du formulaire (upload PDF)
+        Route::post('/quizzes/generate', 'QuizController@generateQuiz')->name('panel.quiz.upload');
+
+
       
         // -----> Notification routes ---------------------------------------------------------
         Route::group(['prefix' => 'notifications'], function () {
