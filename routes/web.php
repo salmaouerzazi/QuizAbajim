@@ -6,7 +6,6 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Controllers\Panel\CardReservationController;
 
-
 /*
 |--------------------------------------------------------------------------
 | Web Routes
