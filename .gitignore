@@ -27,3 +27,5 @@ yarn-error.log
 /.idea
 /.vscode
 /bootstrap/cache/*.php
+/MODEL/utils/__pycache__
+/MODEL/utils/gpt_utils.py
