@@ -34,73 +34,80 @@ class QuizController extends Controller
      */
     public function generate(Request $request)
 {
-    $request->validate([
-        'pdf' => 'required|mimes:pdf|max:10240',
-        'num_questions' => 'required|integer|min:1',
+ 
+    // $request->validate([
+    //     'pdf' => 'required|mimes:pdf|max:10240',
+    //     'num_questions' => 'required|integer|min:1',
        
-    ]);
+    // ]);
 
     $pdf = $request->file('pdf');
     $filename = time() . '-' . $pdf->getClientOriginalName();
-    $path = $pdf->storeAs('uploads', $filename);
-    $fullPath = storage_path('app/' . $path);
+    $path = $pdf->move(public_path('uploads'), $filename);
 
-    try {
+    $fullPath = public_path($path);
+ 
+
+    // try {
+      
         $response = Http::attach(
-            'pdf', file_get_contents($fullPath), $pdf->getClientOriginalName()
+            'pdf', file_get_contents(public_path('uploads/' . $filename)), $pdf->getClientOriginalName()
         )->post('http://127.0.0.1:8080/generate_quiz', [
             'num_questions' => $request->input('num_questions', 5),
             'lang' => $request->input('lang', 'auto'),
         ]);
 
+        if (!$response->successful()) {
+            return back()->withErrors(['error' => 'Erreur lors de la communication avec le service de génération de quiz.']);
+        }
+  
         $result = $response->json();
 
-        if (isset($result['error'])) {
-            return back()->withErrors(['error' => $result['error']]);
-        }
+        // if (isset($result['error'])) {
+        //     return back()->withErrors(['error' => $result['error']]);
+        // }
 
-        DB::beginTransaction();
-
-        $quiz = Quiz::create([
-            'model_type' => null,
-            'model_id' => null,
-            'level_id' => $request->input('level'),
-            'material_id' => $request->input('subject', null),
-            'question_count' => count($result['quiz']),
-            'pdf_path' => $path,
-            'teacher_id' => auth()->id(),
-            'created_by' => auth()->id(),
-        ]);
+       // DB::beginTransaction();
+;
+    $quiz = new Quiz();
+    $quiz->model_type = null;
+    $quiz->model_id = 0;
+    $quiz->level_id = $request->input('level');
+    $quiz->material_id = $request->input('subject');
+    $quiz->question_count = count($result['quiz']); // 
+    $quiz->pdf_path = $path;
+    $quiz->teacher_id = auth()->id();
+    $quiz->save();
 
         foreach ($result['quiz'] as $questionData) {
             $question = Question::create([
                 'quiz_id' => $quiz->id,
-                'type' => $questionData['type'],
+                'type' => $questionData['type'] === 'matching' ? 'arrow' : $questionData['type'],
                 'question_text' => $questionData['question_text'],
-                'score' => $questionData['score'],
+                'score' =>  1, //
                 'is_valid' => true,
             ]);
 
-            foreach ($questionData['answers'] as $answerText => $isValid) {
-                Answer::create([
-                    'question_id' => $question->id,
-                    'answer_text' => $answerText,
-                    'is_valid' => $isValid,
-                ]);
-            }
+            // foreach ($questionData['answers'] as $answerText => $isValid) {
+            //     Answer::create([
+            //         'question_id' => $question->id,
+            //         'answer_text' => $answerText,
+            //         'is_valid' => $isValid,
+            //     ]);
+            // }
         }
 
-        DB::commit();
+        //DB::commit();
 
-        session(['quiz' => $result['quiz']]);
+        //session(['quiz' => $result['quiz']]);
 
-        return redirect()->route('panel.quiz.edit'); // ou une autre route de ton choix
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error($e);
-        return back()->withErrors(['error' => 'Erreur lors de la génération ou de la sauvegarde du quiz : ' . $e->getMessage()]);
-    }
+        return response()->json(['message'=>'dffffff']); // ou une autre route de ton choix
+//view('web.default.panel.quiz.teacher.edit', compact('quizedit'));
+    // } catch (\Exception $e) {
+    //     DB::rollBack();
+    //     \Log::error($e);
+    //     return back()->withErrors(['error' => 'Erreur lors de la génération ou de la sauvegarde du quiz : ' . $e->getMessage()]);
+    // }
 }
 
     /**
