@@ -36,8 +36,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Route;
 // UserController
 use App\Http\Controllers\Panel\UserController;
-use App\Models\Concours;
-use App\Models\VideoConcour;
 
 class DashboardController extends Controller
 {
@@ -571,12 +569,6 @@ class DashboardController extends Controller
 
         // ------------------- FILTER MANUELS BY LEVEL AND MATERIAL ----------------------------------------
         $matiere1 = $this->filterManuelsByMatiereAndLevel($request);
-        $concours = Concours::all();
-
-        $videoCount = [];
-        foreach ($concours as $concour) {
-            $videoCount[$concour->id] = VideoConcour::where('concours_id', $concour->id)->count();
-        }
         $nextBadge = $user->getBadges(true, true);
 
         // -------------------- RETURN DATA TO THE BLADE ---------------------------------------
@@ -584,8 +576,6 @@ class DashboardController extends Controller
             'pageTitle' => trans('panel.dashboard'),
             'nextBadge' => $nextBadge,
             'sectionm' => $section,
-            'concours' => $concours,
-            'videoCount'=>$videoCount,
             'levelm' => $level,
             'videos' => $videos,
             'matiere' => $matiere,

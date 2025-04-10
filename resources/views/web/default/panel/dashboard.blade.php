@@ -266,25 +266,6 @@
             margin-bottom: 16px;
         }
 
-        /*
-                  When we switch to 'mobile-view-concours',
-                  just stack the items one under another.
-                */
-        .mobile-view-concours {
-            display: block !important;
-            width: 100% !important;
-        }
-
-        .mobile-view-concours .swiper-wrapper {
-            display: block !important;
-        }
-
-        .mobile-view-concours .swiper-slide {
-            display: block !important;
-            width: 100% !important;
-            margin-bottom: 16px;
-        }
-
         /* Hide the navigation arrows on mobile when stacking */
         @media (max-width: 576px) {
 
@@ -427,129 +408,6 @@
                 </div>
             </div>
 
-        </div>
-    </section>
-    {{-- -------------------- Concours ----------------- --}}
-    <section class="pl-20 pr-20">
-        <div class="panel-section-card py-20 px-25">
-            <div class="row">
-                <div class="col-lg-8 col-12 mb-10">
-                    <h1 class="dashboard-title">{{ trans('panel.concours') }}</h1>
-                    <h3 class="dashboard-subtitle ml-5"> ({{ trans('panel.start_creating_concours') }})</h3>
-                </div>
-                <div class="col-lg-2 col-12 mb-10">
-                </div>
-                <div class="col-lg-2 col-12 ml-0">
-                    <div class="d-flex justify-content-between align-items-center mb-10">
-                        <a href="/panel/concours" class="view-all">{{ trans('panel.view_all') }}</a>
-                    </div>
-                </div>
-            </div>
-
-            <div id="concours-skeleton" class="skeleton-placeholder">
-                @for ($i = 0; $i < count($webinars); $i++)
-                    <div class="skeleton-webinar-card"></div>
-                @endfor
-            </div>
-
-            <div id="concours-content" style="display: none;"> {{-- style="display: none;" --}}
-                <div class="row">
-                    <div class="swiper-container swiper-container-concours">
-                        <div class="swiper-wrapper">
-                            @if (!empty($concours))
-                                @php
-                                    $badgeColors = [
-                                        '1' => '#FFA200C4',
-                                        '2' => '#0C9A8F',
-                                        '3' => '#2CC0CA',
-                                        '4' => '#0751b0',
-                                        '5' => '#c674b5',
-                                        '6' => 'badge-secondary',
-                                    ];
-
-                                    // Default color if not found
-                                    $defaultBadgeColor = 'badge-primary';
-                                @endphp
-                                @foreach ($concours as $concour)
-                                    @php
-                                        // Get color from the array or use the default color
-                                        $badgeColor = $badgeColors[$concour->id] ?? $defaultBadgeColor;
-                                    @endphp
-                                    <div class="swiper-slide">
-                                        <a href="/panel/concours/{{ $concour->id }}">
-                                            <div class="manuel-card">
-                                                <div class="image-box">
-                                                    <img src="{{ $concour->image_cover_path }}" class="img-cover"
-                                                        alt="{{ $concour->title }}" style="object-fit: contain!important;">
-                                                </div>
-                                                <div class="manuel-card-body w-100 d-flex flex-column">
-                                                    <div
-                                                        class="d-flex align-items-center justify-content-between flex-wrap mt-auto">
-                                                        <h3 class="font-12 text-dark-blue" title="{{ $concour->title }}">
-                                                            مناظرات {{ Str::limit($concour->material->name, 14, '...') }}
-                                                        </h3>
-
-                                                        <div class="d-flex align-items-center">
-                                                            <span class="badge"
-                                                                style="background-color: {{ $badgeColor }}; color: white;">
-                                                                {{ $concour->title }}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="row">
-                                                        <div class="col-md-6">
-                                                            <!-- Video Count -->
-                                                            <div class="d-flex align-items-center mt-2">
-                                                                <i class="fas fa-video mr-10"
-                                                                    style="color: {{ $badgeColor }};"></i>
-                                                                <span
-                                                                    class="stat-value text-muted">{{ \App\Models\VideoConcour::where('concours_id', $concour->id)->count() }}
-                                                                </span>
-                                                            </div>
-                                                            <span>عدد فيديوهاتك في الكتاب {{ $concour->total_icon }}</span>
-
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <!--  Progress -->
-                                                            ({{ number_format((\App\Models\VideoConcour::where('concours_id', $concour->id)->count() * 100) / $concour->total_icon, 0) }}%)
-                                                        </div>
-                                                    </div>
-                                                    <!-- Concours Progress -->
-                                                    <div class="progress mt-2" style="height: 10px;">
-                                                        <div class="progress-bar bg-success" role="progressbar"
-                                                            style="width: {{ $concour->progress }}%;"
-                                                            aria-valuenow="{{ $concour->progress }}" aria-valuemin="0"
-                                                            aria-valuemax="100">
-                                                            {{ $concour->total_icon }}%
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </a>
-                                    </div>
-                                    @if (count($webinars) == 1)
-                                        <div class="swiper-slide"></div>
-                                        <div class="swiper-slide"></div>
-                                    @endif
-                                @endforeach
-                            @else
-                                <div class="col-12 justify-content-center">
-                                    @include(getTemplate() . '.includes.no-result', [
-                                        'file_name' => 'webinar.png',
-                                        'title' => trans('panel.you_not_have_any_concours'),
-                                        'hint' => trans('panel.no_result_hint'),
-                                        'btn' => [
-                                            'url' => '/panel/concours/new',
-                                            'text' => trans('panel.create_a_concours'),
-                                        ],
-                                    ])
-                                </div>
-                            @endif
-                        </div>
-                        <div class="swiper-pagination swiper-pagination-concours"></div>
-                    </div>
-                </div>
-            </div>
         </div>
     </section>
     {{-- -------------------- Courses ----------------- --}}
@@ -880,7 +738,6 @@
     <script>
         // We'll store the Manuels Swiper instance here if needed
         let manuelsSwiper = null;
-        let concoursSwiper = null;
         // Initialize Swiper for manuels
         function initManuelsSwiper() {
             manuelsSwiper = new Swiper('.swiper-container-manuels', {
@@ -910,48 +767,11 @@
             });
         }
 
-        // Initialize Swiper for concours
-        function initConcoursSwiper() {
-            concoursSwiper = new Swiper('.swiper-container-concours', {
-                slidesPerView: 1,
-                spaceBetween: 10,
-                navigation: {
-                    nextEl: '.swiper-button-next-concours',
-                    prevEl: '.swiper-button-prev-concours',
-                },
-                loop: false,
-                breakpoints: {
-                    576: {
-                        slidesPerView: 2,
-                    },
-                    768: {
-                        slidesPerView: 3,
-                    },
-                    992: {
-                        slidesPerView: 4,
-                    },
-                },
-                on: {
-                    slideChange: function() {
-                        toggleNavigationVisibility(this);
-                    },
-                },
-            });
-        }
-
         // Destroy Swiper for manuels if it exists
         function destroyManuelsSwiper() {
             if (manuelsSwiper) {
                 manuelsSwiper.destroy(true, true);
                 manuelsSwiper = null;
-            }
-        }
-
-        // Destroy Swiper for concours if it exists
-        function destroyConcoursSwiper() {
-            if (concoursSwiper) {
-                concoursSwiper.destroy(true, true);
-                concoursSwiper = null;
             }
         }
 
@@ -978,7 +798,6 @@
         // Handle whether to show stacked or swiper based on screen width
         function handleResize() {
             const manuelsContainer = document.querySelector('.swiper-container-manuels');
-            const concoursContainer = document.querySelector('.swiper-container-concours');
             const isMobile = window.innerWidth <= 576;
 
             if (isMobile) {
@@ -986,9 +805,6 @@
                 destroyManuelsSwiper();
                 manuelsContainer.classList.add('mobile-view-manuels');
 
-                // If mobile, destroy the swiper (if active) and add the stacked class for concours
-                destroyConcoursSwiper();
-                concoursContainer.classList.add('mobile-view-concours');
             } else {
                 // If desktop, remove stacked class and initialize swiper (if not initialized) for manuels
                 manuelsContainer.classList.remove('mobile-view-manuels');
@@ -996,11 +812,6 @@
                     initManuelsSwiper();
                 }
 
-                // If desktop, remove stacked class and initialize swiper (if not initialized) for concours
-                concoursContainer.classList.remove('mobile-view-concours');
-                if (!concoursSwiper) {
-                    initConcoursSwiper();
-                }
             }
         }
 
@@ -1016,12 +827,6 @@
             const webinarsContent = document.getElementById('webinars-content');
             webinarsSkeleton.style.display = 'none';
             webinarsContent.style.display = 'block';
-
-            // 3) Same for concours skeleton
-            const concoursSkeleton = document.getElementById('concours-skeleton');
-            const concoursContent = document.getElementById('concours-content');
-            concoursSkeleton.style.display = 'none';
-            concoursContent.style.display = 'block';
 
             // 3) Call handleResize once on page load (for manuels)
             handleResize();
