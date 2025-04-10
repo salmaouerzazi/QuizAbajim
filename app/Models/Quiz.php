@@ -2,88 +2,48 @@
 
 namespace App\Models;
 
-use App\Models\Traits\SequenceContent;
 use Illuminate\Database\Eloquent\Model;
-use Astrotomic\Translatable\Contracts\Translatable as TranslatableContract;
-use Astrotomic\Translatable\Translatable;
+use SoftDeletes;
+use App\Models\School_level;
+use App\Models\Material;
+use App\User;
 
-class Quiz extends Model implements TranslatableContract
+class Quiz extends Model
 {
-    use Translatable;
-    use SequenceContent;
-
-    const ACTIVE = 'active';
-    const INACTIVE = 'inactive';
+    protected $dateFormat = 'U';
+    
 
     public $timestamps = false;
-    protected $table = 'quizzes';
+    protected $table = 'quiz';
     protected $guarded = ['id'];
 
-    public $translatedAttributes = ['title'];
+    protected $fillable = ['model_type', 'model_id', 'level_id', 'material_id', 'question_count', 'pdf_path', 'teacher_id', 'created_by', 'updated_by'];
 
-    public function getTitleAttribute()
-    {
-        return getTranslateAttributeValue($this, 'title');
+    /**
+     * Relationship with Level
+     */
+    public function level(){
+        return $this->belongsTo(School_level::class);
     }
 
-
-    public function quizQuestions()
-    {
-        return $this->hasMany('App\Models\QuizzesQuestion', 'quiz_id', 'id');
+    /**
+     * Relationship with Material
+     */
+    public function material(){
+        return $this->belongsTo(Material::class);
+    }
+    /**
+     * Relationship with Teacher
+     */
+    public function teacher(){
+        return $this->belongsTo(User::class);
+    }
+    
+    /**
+     * Relationship with Question
+     */
+    public function questions(){
+        return $this->hasMany(Question::class);
     }
 
-    public function quizResults()
-    {
-        return $this->hasMany('App\Models\QuizzesResult', 'quiz_id', 'id');
-    }
-
-    public function creator()
-    {
-        return $this->belongsTo('App\User', 'creator_id', 'id');
-    }
-
-    public function webinar()
-    {
-        return $this->belongsTo('App\Models\Webinar', 'webinar_id', 'id');
-    }
-
-    public function teacher()
-    {
-        return $this->belongsTo('App\User', 'creator_id', 'id');
-    }
-
-    public function certificates()
-    {
-        return $this->hasMany('App\Models\Certificate', 'quiz_id', 'id');
-    }
-
-    public function chapter()
-    {
-        return $this->belongsTo('App\Models\WebinarChapter', 'chapter_id', 'id');
-    }
-
-
-    public function increaseTotalMark($grade)
-    {
-        $total_mark = $this->total_mark + $grade;
-        return $this->update(['total_mark' => $total_mark]);
-    }
-
-    public function decreaseTotalMark($grade)
-    {
-        $total_mark = $this->total_mark - $grade;
-        return $this->update(['total_mark' => $total_mark]);
-    }
-
-    public function getUserCertificate($user, $quiz_result)
-    {
-        if (!empty($user) and !empty($quiz_result)) {
-            return Certificate::where('quiz_id', $this->id)
-                ->where('student_id', $user->id)
-                ->where('quiz_result_id', $quiz_result->id)
-                ->first();
-        }
-
-        return null;
-    }
 }

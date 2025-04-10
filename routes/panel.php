@@ -6,8 +6,7 @@ use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Web\MeetingController;
 use App\Http\Controllers\Panel\CardReservationController;
 use App\Http\Controllers\Panel\ConcoursController;
-
-
+use App\Http\Controllers\Panel\QuizController;
 /*
 |--------------------------------------------------------------------------
 | User Panel Routes
@@ -97,9 +96,17 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
 
 
         // ------ Quiz routes ----------------------------
-        Route::get('/quizzes', 'QuizController@indexQuiz')->name('panel.teacher.quiz');
-        // Traitement du formulaire (upload PDF)
-        Route::post('/quizzes/generate', 'QuizController@generateQuiz')->name('panel.quiz.upload');
+      // routes/web.php OU routes/panel.php (selon ta structure)
+
+        Route::get('/quizzes', 'QuizController@indexQuiz')->name('panel.teacher.quiz.index');
+        Route::post('/quizzes/generate', 'QuizController@generate')->name('panel.quiz.upload');
+        Route::get('/quizzes/edit', 'QuizController@editQuiz')->name('panel.quiz.edit');
+
+
+
+
+        
+
 
 
       
