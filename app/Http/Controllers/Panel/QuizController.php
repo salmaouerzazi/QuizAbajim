@@ -35,12 +35,6 @@ class QuizController extends Controller
     public function generate(Request $request)
 {
  
-    // $request->validate([
-    //     'pdf' => 'required|mimes:pdf|max:10240',
-    //     'num_questions' => 'required|integer|min:1',
-       
-    // ]);
-
     $pdf = $request->file('pdf');
     $filename = time() . '-' . $pdf->getClientOriginalName();
     $path = $pdf->move(public_path('uploads'), $filename);
@@ -62,46 +56,47 @@ class QuizController extends Controller
         }
   
         $result = $response->json();
-
+    //  Sauvegarde du résultat dans la session
+        session()->put('model', $result);
         // if (isset($result['error'])) {
         //     return back()->withErrors(['error' => $result['error']]);
         // }
 
        // DB::beginTransaction();
-;
-    $quiz = new Quiz();
-    $quiz->model_type = null;
-    $quiz->model_id = 0;
-    $quiz->level_id = $request->input('level');
-    $quiz->material_id = $request->input('subject');
-    $quiz->question_count = count($result['quiz']); // 
-    $quiz->pdf_path = $path;
-    $quiz->teacher_id = auth()->id();
-    $quiz->save();
 
-        foreach ($result['quiz'] as $questionData) {
-            $question = Question::create([
-                'quiz_id' => $quiz->id,
-                'type' => $questionData['type'] === 'matching' ? 'arrow' : $questionData['type'],
-                'question_text' => $questionData['question_text'],
-                'score' =>  1, //
-                'is_valid' => true,
-            ]);
+    // $quiz = new Quiz();
+    // $quiz->model_type = null;
+    // $quiz->model_id = 0;
+    // $quiz->level_id = $request->input('level');
+    // $quiz->material_id = $request->input('subject');
+    // $quiz->question_count = count($result['quiz']); // 
+    // $quiz->pdf_path = $path;
+    // $quiz->teacher_id = auth()->id();
+    // $quiz->save();
 
-            // foreach ($questionData['answers'] as $answerText => $isValid) {
-            //     Answer::create([
-            //         'question_id' => $question->id,
-            //         'answer_text' => $answerText,
-            //         'is_valid' => $isValid,
-            //     ]);
-            // }
-        }
+        // foreach ($result['quiz'] as $questionData) {
+        //     $question = Question::create([
+        //         'quiz_id' => $quiz->id,
+        //         'type' => $questionData['type'] === 'matching' ? 'arrow' : $questionData['type'],
+        //         'question_text' => $questionData['question_text'],
+        //         'score' =>  1, //
+        //         'is_valid' => true,
+        //     ]);
+
+        //     // foreach ($questionData['answers'] as $answerText => $isValid) {
+        //     //     Answer::create([
+        //     //         'question_id' => $question->id,
+        //     //         'answer_text' => $answerText,
+        //     //         'is_valid' => $isValid,
+        //     //     ]);
+        //     // }
+        // }
 
         //DB::commit();
 
         //session(['quiz' => $result['quiz']]);
 
-        return response()->json(['message'=>'dffffff']); // ou une autre route de ton choix
+        return redirect('/panel/quizzes/edit'); // ou une autre route de ton choix
 //view('web.default.panel.quiz.teacher.edit', compact('quizedit'));
     // } catch (\Exception $e) {
     //     DB::rollBack();
@@ -115,8 +110,16 @@ class QuizController extends Controller
      */
     public function editQuiz()
     {
-        $quiz = session('quiz');
-        return view('web.default.panel.quiz.teacher.edit', compact('quiz'));
+
+        $result = session('model');
+
+        $data=[
+        'result'=>$result,
+
+        ];
+
+        return view('web.default.panel.quiz.teacher.edit',$data);
 
     }
+    
 }
