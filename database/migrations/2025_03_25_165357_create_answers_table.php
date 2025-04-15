@@ -17,7 +17,7 @@ class CreateAnswersTable extends Migration
             $table->id();
             $table->unsignedBigInteger('question_id'); 
             $table->string('answer_text');
-            $table->boolean('is_valid')->default(false); // false by default is that correct ?
+            $table->boolean('is_valid')->default(false)->nullable();
 
              $table->timestamps();
              $table->foreign('question_id')->references('id')->on('questions')->onDelete('cascade');

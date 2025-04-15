@@ -28,3 +28,5 @@ yarn-error.log
 /.vscode
 /bootstrap/cache/*.php
 /MODEL/utils/__pycache__
+/MODEL/utils
+
