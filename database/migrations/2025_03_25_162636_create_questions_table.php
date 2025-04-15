@@ -17,7 +17,7 @@ class CreateQuestionsTable extends Migration
             $table->id();
             $table->unsignedBigInteger('quiz_id');
             $table->enum('type', ['binaire', 'qcm', 'arrow']);
-            $table->boolean('is_valid')->default(true);
+            $table->boolean('is_valid')->default(true)->nullable();
             $table->string('question_text');
             $table->integer('score');
             $table->timestamps();

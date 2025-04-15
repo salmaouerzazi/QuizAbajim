@@ -100,7 +100,7 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
 
         Route::get('/quizzes', 'QuizController@indexQuiz')->name('panel.teacher.quiz.index');
         Route::post('/quizzes/generate', 'QuizController@generate')->name('panel.quiz.upload');
-        Route::get('/quizzes/edit', 'QuizController@editQuiz')->name('panel.quiz.edit');
+        Route::get('/quizzes/edit/{id}', 'QuizController@editQuiz')->name('panel.quiz.edit');
 
 
 

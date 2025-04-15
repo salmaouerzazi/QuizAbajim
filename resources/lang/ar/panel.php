@@ -443,5 +443,6 @@ return [
     "file_size_exceeded" => "حجم الملف كبير جدا",
     "payment_proof_uploaded_successfully" => "تم تحميل إثبات الدفع بنجاح",
     "wallet" => "محفظة نقودي",
-    "quiz" => "التّحديات"
+    "quiz" => "التّحديات",
+    "match_question" => "اربط بسهم"
 ];

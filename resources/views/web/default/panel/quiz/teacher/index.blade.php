@@ -66,9 +66,6 @@
             </div>
         </div>
     </form>
-    <form action="{{ route('panel.quiz.edit') }}" method="GET">
-    <button type="submit" class="btn btn-primary">Modifier les questions générées</button>
-</form>
 </div>
 
 <!-- JS de gestion upload -->
