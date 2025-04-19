@@ -54,6 +54,10 @@ class QuizController extends Controller
             return back()->withErrors(['error' => 'Erreur lors de la communication avec le service de génération de quiz.']);
         }
         $result = $response->json();
+        $quizText = $result['quiz'];
+        $language = $result['language'];
+        $textContent = $result['text'] ?? '';
+
         DB::beginTransaction();
 
         $quiz = new Quiz();
@@ -64,6 +68,7 @@ class QuizController extends Controller
         $quiz->question_count = $request->input('num_questions', 5);
         $quiz->pdf_path = $path;
         $quiz->teacher_id = auth()->id();
+        $quiz->text_content = $textContent; // texte extrait du PDF
         $quiz->save();
 
         $quizText = $result['quiz'];
@@ -253,7 +258,6 @@ class QuizController extends Controller
         $questions = Question::where('quiz_id', $quiz->id)->get();
         $answers = Answer::whereIn('question_id', $questions->pluck('id'))->get();
 
-
         $data = [
             'quiz' => $quiz,
             'questions' => $questions,
@@ -261,5 +265,147 @@ class QuizController extends Controller
         ];
 
         return view('web.default.panel.quiz.teacher.edit', $data);
+    }
+    /**
+     * ajouter un question .
+     */
+    public function addSingleQuestion(Request $request, $id)
+    {
+        $quiz = Quiz::findOrFail($id);
+
+        $response = Http::asForm()->post('http://127.0.0.1:8080/generate_quiz', [
+            'text' => $quiz->text_content,
+            'num_questions' => 1,
+            'lang' => 'auto',
+        ]);
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Erreur IA'], 500);
+        }
+        $result = $response->json();
+        $quizText = $result['quiz'];
+        $language = $result['language'];
+        $patterns = config('constants.patterns');
+
+        preg_match_all($patterns[$language]['question'], $quizText, $matches, PREG_SET_ORDER);
+
+        if (empty($matches)) {
+            return response()->json(['error' => 'Aucune question détectée'], 400);
+        }
+
+        $match = $matches[0];
+        $type = trim($match[1]);
+        $body = trim($match[2]);
+
+        $parsedType = $this->normalizeQuestionType($type, $language);
+
+        $questionData = [
+            'type' => $parsedType,
+            'question_text' => '',
+            'answers' => [],
+            'score' => 4,
+        ];
+
+        if ($parsedType === 'binaire' && preg_match($patterns[$language]['tf'], $body, $m)) {
+            $questionData['question_text'] = trim($m[1]);
+            $questionData['is_valid'] = in_array(strtolower($m[2]), ['true', 'vrai', 'صحيح']);
+        } elseif ($parsedType === 'qcm' && preg_match($patterns[$language]['mcq'], $body, $m)) {
+            $questionBody = trim($m[1]);
+            $correct = trim($m[2]);
+            $lines = explode("\n", $questionBody);
+            $questionData['question_text'] = array_shift($lines);
+
+            foreach ($lines as $line) {
+                if (preg_match('/^([A-Zأ-ي])\)\s*(.*)/u', trim($line), $opt)) {
+                    $questionData['answers'][] = [
+                        'answer_text' => trim($opt[2]),
+                        'is_valid' => trim($opt[1]) === $correct,
+                    ];
+                }
+            }
+        } elseif ($parsedType === 'arrow' && preg_match($patterns[$language]['match'], $body, $m)) {
+            $colA = preg_split('/\d+\)/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY);
+            $colBText = trim($m[2]);
+
+            preg_match_all('/[a-zأ-ي]\)\s*(.+)/u', $colBText, $matchesB);
+            $colB = $matchesB[1] ?? [];
+            $mapping = explode("\n", trim($m[3]));
+
+            foreach ($mapping as $map) {
+                if (preg_match('/(\d+)\s*→\s*([^\s]+)/u', trim($map), $link)) {
+                    $a = $colA[(int) $link[1] - 1] ?? null;
+                    $b = $colB[$this->mapLetterToIndex($link[2], $language)] ?? null;
+                    if ($a && $b) {
+                        $questionData['answers'][] = [
+                            'answer_text' => $a,
+                            'matching' => $b,
+                        ];
+                    }
+                }
+            }
+        }
+
+        // 💾 Sauvegarde en base
+        $question = Question::create([
+            'quiz_id' => $quiz->id,
+            'type' => $questionData['type'],
+            'question_text' => $questionData['question_text'],
+            'score' => $questionData['score'],
+            'is_valid' => $questionData['is_valid'] ?? null,
+        ]);
+
+        foreach ($questionData['answers'] as $a) {
+            Answer::create([
+                'question_id' => $question->id,
+                'answer_text' => $a['answer_text'] ?? '',
+                'is_valid' => $a['is_valid'] ?? null,
+                'matching' => $a['matching'] ?? null,
+            ]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+    public function updateQuiz(Request $request, $id)
+    {
+        $quiz = Quiz::findOrFail($id);
+        DB::beginTransaction();
+
+        try {
+            // Supprimer les anciennes questions et réponses (facultatif)
+            foreach ($quiz->questions as $q) {
+                $q->answers()->delete();
+                $q->delete();
+            }
+
+            foreach ($request->input('questions') as $qData) {
+                $question = new Question([
+                    'quiz_id' => $quiz->id,
+                    'type' => $qData['type'] ?? 'qcm',
+                    'question_text' => $qData['question'] ?? $qData['question_text'],
+                    'score' => $qData['score'] ?? 1,
+                    'is_valid' => isset($qData['correct']) ? ($qData['correct'] === 'true' ? 1 : 0) : null,
+                ]);
+                $question->save();
+
+                if (!empty($qData['answers'])) {
+                    foreach ($qData['answers'] as $a) {
+                        Answer::create([
+                            'question_id' => $question->id,
+                            'answer_text' => $a['answer_text'] ?? '',
+                            'is_valid' => $a['is_valid'] ?? null,
+                            'matching' => $a['matching'] ?? null,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('panel.quiz.drafts')->with('success', 'تم حفظ الاختبار في المسودات بنجاح.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error($e);
+            return back()->withErrors(['error' => 'Erreur lors de la mise à jour du quiz.']);
+        }
     }
 }

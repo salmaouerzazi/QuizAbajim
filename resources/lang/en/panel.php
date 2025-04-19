@@ -324,4 +324,6 @@ return [
     "no_videos" => "No videos yet !",
     "start_creating_video" =>"Start creating your own videos and share them with your students",
     "click_here" => "Click here",
+    "question" => "question",
+
 ];
