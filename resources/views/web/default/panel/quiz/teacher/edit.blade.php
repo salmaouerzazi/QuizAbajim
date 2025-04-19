@@ -2,37 +2,61 @@
 
 @section('content')
     <style>
-        .card-header.bg-primary {
-            background-color: #1f3c88 !important;
+        /* Animation à l'apparition */
+        @keyframes fadeInCard {
+            0% {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
-        .btn.btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
+        .card.fade-in {
+            animation: fadeInCard 0.4s ease-in-out;
         }
 
-        .btn.btn-primary:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
+        /* Animation à la suppression */
+        @keyframes fadeOutCard {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
         }
 
-        .list-group-item.active {
+        .card.fade-out {
+            animation: fadeOutCard 0.3s ease-in forwards;
+        }
+
+        /* Ajout d’un petit effet hover aux boutons */
+        button:hover,
+        .scroll-to:hover {
+            transform: scale(1.03);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .list-group-item.active,
+        .list-group-item.active a {
             background-color: #1f3c88;
             border-color: #1f3c88;
-            color: #fff;
+            color: #ffffff !important;
+            /* texte blanc */
         }
 
-        .badge.bg-light.border {
-            background-color: #f0f4f8;
-            color: #333;
-        }
-
-        .form-control,
-        .form-select {
-            background-color: #f4f8fc;
-            border: 1px solid #d0d7e2;
+        .list-group-item.active .badge {
+            background-color: #ffffff;
+            color: #1f3c88;
         }
     </style>
+
     <div class="container-fluid mt-4" dir="rtl">
         <div class="row">
             <div class="col-md-3">
@@ -40,12 +64,16 @@
                     <div class="card-header bg-white text-center fw-bold">📋 الأسئلة ({{ count($questions) }})</div>
                     <ul class="list-group list-group-flush">
                         @foreach ($questions as $index => $q)
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <li class="list-group-item d-flex justify-content-between align-items-center question-item"
+                                data-id="question{{ $index }}">
                                 <a href="#" class="text-decoration-none text-dark scroll-to"
-                                    data-target="question{{ $index }}">سؤال {{ $index + 1 }}</a>
+                                    data-target="question{{ $index }}">
+                                    سؤال {{ $index + 1 }}
+                                </a>
                                 <span class="badge bg-light border">{{ $q['score'] }} نقاط</span>
                             </li>
                         @endforeach
+
                         <li class="list-group-item text-center text-primary" style="cursor:pointer;">
                             + إضافة سؤال آخر
                         </li>
@@ -59,8 +87,10 @@
                     @foreach ($questions as $index => $q)
                         <div class="card shadow-sm mb-4 rounded-4 border-0" id="question{{ $index }}">
                             <div class="card-header bg-primary text-white rounded-top-4 d-flex justify-content-between">
-                                <span>سؤال {{ $index + 1 }}</span>
-                                <button type="button" class="btn btn-sm btn-light text-danger">🗑️</button>
+                                <span>{{ trans('panel.question') }} {{ $index + 1 }}</span>
+                                <button type="button" class="btn btn-sm btn-light text-danger delete-question-btn"
+                                    data-index="{{ $index }}">🗑️</button>
+
                             </div>
 
                             <div class="card-body" style="background: #f9f9f9;">
@@ -69,7 +99,6 @@
                                     <input type="number" class="form-control form-control-sm w-25"
                                         name="questions[{{ $index }}][score]" value="{{ $q['score'] ?? 1 }}">
                                 </div>
-
                                 {{-- Matching --}}
                                 @if ($q['type'] === 'ربط' || $q['type'] === 'arrow')
                                     <label class="form-label fw-bold">السؤال</label>
@@ -78,7 +107,7 @@
                                         value="{{ $q['question'] ?? trans('panel.match_question') }}">
 
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-6" id="column-left-{{ $index }}">
                                             <label class="form-label fw-bold">العناصر</label>
                                             @foreach ($q['answers'] as $i => $answer)
                                                 <input type="text" class="form-control mb-2"
@@ -86,8 +115,7 @@
                                                     value="{{ $answer['answer_text'] ?? '' }}">
                                             @endforeach
                                         </div>
-
-                                        <div class="col-md-6">
+                                        <div class="col-md-6" id="column-right-{{ $index }}">
                                             <label class="form-label fw-bold">الإجابات المطابقة</label>
                                             @foreach ($q['answers'] as $i => $answer)
                                                 <input type="text" class="form-control mb-2"
@@ -95,14 +123,25 @@
                                                     value="{{ $answer['matching'] ?? '' }}">
                                             @endforeach
                                         </div>
+                                        <div class="text-end mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary add-matching-row"
+                                                data-index="{{ $index }}">
+                                                ➕ إضافة عنصر
+                                            </button>
+                                        </div>
                                     </div>
-
                                     {{-- Vrai/Faux --}}
                                 @elseif($q['type'] === 'صحيح/خطأ' || $q['type'] === 'binaire')
                                     <label class="form-label fw-bold">البيان</label>
                                     <input type="text" name="questions[{{ $index }}][question]"
                                         class="form-control mb-3" value="{{ $q['question_text'] ?? '' }}">
-
+                                    @php
+                                        $correct = isset($q['correct'])
+                                            ? $q['correct']
+                                            : (isset($q['is_valid'])
+                                                ? (bool) $q['is_valid']
+                                                : null);
+                                    @endphp
                                     <div class="d-flex gap-3">
                                         @php
                                             $correct = isset($q['correct'])
@@ -119,7 +158,6 @@
                                                     {{ $correct === true ? 'checked' : '' }}>
                                                 صحيح
                                             </label>
-
                                             <label
                                                 class="btn btn-outline-primary {{ $correct === false ? 'active' : '' }}">
                                                 <input type="radio" class="d-none"
@@ -129,23 +167,20 @@
                                             </label>
                                         </div>
                                     </div>
-
                                     {{-- QCM --}}
                                 @elseif($q['type'] === 'اختيار من متعدد' || $q['type'] === 'qcm')
                                     <label class="form-label fw-bold">السؤال</label>
                                     <input type="text" name="questions[{{ $index }}][question]"
                                         class="form-control mb-3" value="{{ $q['question_text'] ?? '' }}">
-
                                     <label class="form-label fw-bold">الخيارات</label>
                                     @foreach ($q['answers'] as $i => $a)
                                         @php
-                                            $isValid =  $a['is_valid'] 
+                                            $isValid = $a['is_valid'];
                                         @endphp
-
                                         <div class="input-group mb-2">
                                             <div class="input-group-text">
                                                 <input type="radio" name="questions[{{ $index }}][correct]"
-                                                     value="{{ $a['answer_text'] }}" {{ $isValid ? 'checked' : '' }}>
+                                                    value="{{ $a['answer_text'] }}" {{ $isValid ? 'checked' : '' }}>
                                             </div>
                                             <input type="text"
                                                 name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
@@ -158,9 +193,8 @@
                             </div>
                         </div>
                     @endforeach
-
                     <div class="text-end mt-4">
-                        <button class="btn btn-primary px-5">💾 حفظ</button>
+                        <button class="btn btn-primary px-5"> حفظ</button>
                     </div>
                 </form>
             </div>
@@ -168,18 +202,215 @@
     </div>
 
     <script>
+        document.querySelectorAll('input[placeholder="➕ إضافة إجابة جديدة"]').forEach(function(input) {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && input.value.trim() !== '') {
+                    e.preventDefault();
+
+                    const value = input.value.trim();
+                    const parent = input.closest('.card-body');
+                    const inputs = parent.querySelectorAll(
+                        'input[name^="questions["][name$="[answer_text]"]');
+                    const index = inputs.length;
+
+                    const inputGroup = document.createElement('div');
+                    inputGroup.className = 'input-group mb-2';
+
+                    const radioDiv = document.createElement('div');
+                    radioDiv.className = 'input-group-text';
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = input.name.replace('answers[]', 'correct');
+                    radio.value = value;
+                    radioDiv.appendChild(radio);
+
+                    const textInput = document.createElement('input');
+                    textInput.type = 'text';
+                    textInput.className = 'form-control';
+                    textInput.name = input.name.replace('[]', `[${index}][answer_text]`);
+                    textInput.value = value;
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.onclick = () => inputGroup.remove();
+
+                    inputGroup.appendChild(radioDiv);
+                    inputGroup.appendChild(textInput);
+                    inputGroup.appendChild(deleteBtn);
+
+                    input.before(inputGroup);
+                    input.value = '';
+                }
+            });
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Scrolling automatique vers la question ciblée
             document.querySelectorAll('.scroll-to').forEach(function(link) {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
                     const targetId = this.dataset.target;
                     const el = document.getElementById(targetId);
-                    if (el) el.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
+                    if (el) {
+                        el.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
                 });
             });
+
+            document.querySelectorAll('.delete-question-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const index = this.dataset.index;
+                    const card = document.getElementById('question' + index);
+                    const listItem = document.querySelector('.question-item[data-id="question' +
+                        index + '"]');
+
+                    if (card && confirm('هل أنت متأكد من حذف هذا السؤال؟')) {
+                        card.classList.add('fade-out');
+                        setTimeout(() => {
+                            card.remove();
+                            if (listItem) listItem.remove();
+                            updateQuestionNumbers();
+                        }, 300); // ⏳ attendre la fin de l'animation
+                        // ✅ Supprime la carte principale
+
+                        if (listItem) listItem
+                            .remove(); // ✅ Supprime aussi l'entrée dans la liste de droite
+
+                        updateQuestionNumbers(); // 🔁 Met à jour les index et le scroll
+                    }
+                });
+            });
+
+
+            // Ajout dynamique de colonnes matching avec bouton de suppression
+            document.querySelectorAll('.add-matching-row').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const index = this.dataset.index;
+                    const leftCol = document.getElementById('column-left-' + index);
+                    const rightCol = document.getElementById('column-right-' + index);
+
+                    const count = leftCol.querySelectorAll('.form-control').length;
+
+                    // Créer ligne à gauche (élément)
+                    const leftWrapper = document.createElement('div');
+                    leftWrapper.className = 'd-flex align-items-center gap-2 mb-2';
+
+                    const inputLeft = document.createElement('input');
+                    inputLeft.type = 'text';
+                    inputLeft.className = 'form-control';
+                    inputLeft.name = `questions[${index}][answers][${count}][answer_text]`;
+
+                    leftWrapper.appendChild(inputLeft);
+                    leftCol.appendChild(leftWrapper);
+
+                    // Créer ligne à droite (réponse + bouton 🗑️)
+                    const rightWrapper = document.createElement('div');
+                    rightWrapper.className = 'd-flex align-items-center gap-2 mb-2';
+
+                    const inputRight = document.createElement('input');
+                    inputRight.type = 'text';
+                    inputRight.className = 'form-control';
+                    inputRight.name = `questions[${index}][answers][${count}][matching]`;
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                    deleteBtn.innerHTML = '🗑️';
+
+                    // Supprimer les deux lignes (gauche et droite)
+                    deleteBtn.onclick = () => {
+                        leftCol.removeChild(leftWrapper);
+                        rightCol.removeChild(rightWrapper);
+                    };
+
+                    rightWrapper.appendChild(inputRight);
+                    rightWrapper.appendChild(deleteBtn);
+                    rightCol.appendChild(rightWrapper);
+                });
+            });
+
         });
+
+        function updateQuestionNumbers() {
+            const cards = document.querySelectorAll('.card.shadow-sm.mb-4');
+            const listGroup = document.querySelectorAll('.question-item');
+            const listContainer = document.querySelector('.list-group.list-group-flush');
+
+            // Supprimer tous les éléments actuels de la liste
+            listGroup.forEach(item => item.remove());
+
+            // Re-générer proprement la liste
+            cards.forEach((card, i) => {
+                const id = 'question' + i;
+                card.id = id;
+
+                // Mettre à jour le titre dans le header
+                const title = card.querySelector('.card-header span');
+                if (title) title.textContent = 'سؤال ' + (i + 1);
+
+                // Mettre à jour l’index du bouton supprimer
+                const deleteBtn = card.querySelector('.delete-question-btn');
+                if (deleteBtn) deleteBtn.dataset.index = i;
+
+                // Ajouter l’élément dans la liste à droite
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center question-item';
+                li.setAttribute('data-id', id);
+
+                const a = document.createElement('a');
+                a.href = '#';
+                a.className = 'text-decoration-none text-dark scroll-to';
+                a.dataset.target = id;
+                a.textContent = 'سؤال ' + (i + 1);
+
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-light border';
+                const scoreInput = card.querySelector('input[name^="questions["][name$="[score]"]');
+                badge.textContent = (scoreInput?.value ?? '0') + ' نقاط';
+
+                li.appendChild(a);
+                li.appendChild(badge);
+
+                // Insère avant le bouton "+ إضافة سؤال آخر"
+                const lastItem = listContainer.querySelector('li:last-child');
+                listContainer.insertBefore(li, lastItem);
+            });
+
+            // ✅ Mettre à jour le total dans le header
+            const totalCount = cards.length;
+            const header = document.querySelector('.card-header.bg-white');
+            if (header) {
+                header.innerHTML = `📋 الأسئلة (${totalCount})`;
+            }
+
+            // Rebrancher les événements scroll
+            document.querySelectorAll('.scroll-to').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.dataset.target;
+                    const el = document.getElementById(targetId);
+                    if (el) {
+                        el.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            })
+            // Rebrancher les événements de clic pour surligner l'élément actif
+            document.querySelectorAll('.question-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.question-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+        }
     </script>
 @endsection

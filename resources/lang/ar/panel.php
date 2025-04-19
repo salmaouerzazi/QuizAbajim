@@ -444,5 +444,6 @@ return [
     "payment_proof_uploaded_successfully" => "تم تحميل إثبات الدفع بنجاح",
     "wallet" => "محفظة نقودي",
     "quiz" => "التّحديات",
-    "match_question" => "اربط بسهم"
+    "match_question" => "اربط بسهم",
+    "question" => "السؤال",
 ];
