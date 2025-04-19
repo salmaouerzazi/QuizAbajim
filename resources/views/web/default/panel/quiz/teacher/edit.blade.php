@@ -57,6 +57,7 @@
         }
     </style>
 
+
     <div class="container-fluid mt-4" dir="rtl">
         <div class="row">
             <div class="col-md-3">
@@ -74,16 +75,19 @@
                             </li>
                         @endforeach
 
-                        <li class="list-group-item text-center text-primary" style="cursor:pointer;">
+                        <li id="add-question-btn" class="list-group-item text-center text-primary" style="cursor:pointer;"
+                            data-id="{{ $quiz->id }}">
                             + إضافة سؤال آخر
                         </li>
+
                     </ul>
                 </div>
             </div>
 
             <div class="col-md-9">
-                <form method="POST" action="#">
+                <form method="POST" action="{{ route('panel.quiz.update', ['id' => $quiz->id]) }}">
                     @csrf
+                    @method('PUT')
                     @foreach ($questions as $index => $q)
                         <div class="card shadow-sm mb-4 rounded-4 border-0" id="question{{ $index }}">
                             <div class="card-header bg-primary text-white rounded-top-4 d-flex justify-content-between">
@@ -210,7 +214,7 @@
                     const value = input.value.trim();
                     const parent = input.closest('.card-body');
                     const inputs = parent.querySelectorAll(
-                        'input[name^="questions["][name$="[answer_text]"]');
+                        'input[name^="questions"][name$="[answer_text]"]');
                     const index = inputs.length;
 
                     const inputGroup = document.createElement('div');
@@ -371,7 +375,7 @@
 
                 const badge = document.createElement('span');
                 badge.className = 'badge bg-light border';
-                const scoreInput = card.querySelector('input[name^="questions["][name$="[score]"]');
+                const scoreInput = card.querySelector('input[name^="questions"][name$="[score]"]');
                 badge.textContent = (scoreInput?.value ?? '0') + ' نقاط';
 
                 li.appendChild(a);
@@ -412,5 +416,28 @@
             });
 
         }
+        document.getElementById('add-question-btn').addEventListener('click', function() {
+            const quizId = {{ $quiz->id }};
+            fetch(`/panel/quizzes/add-question/${quizId}`,  {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload(); // ou appeler une fonction JS pour insérer dynamiquement
+                    } else {
+                        alert(data.error || 'Erreur lors de l’ajout');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Erreur AJAX');
+                }); 
+        });
+        
     </script>
 @endsection
