@@ -2,6 +2,59 @@
 
 @section('content')
     <style>
+        .card.fade-out {
+            animation: fadeOutCard 0.3s ease-in-out forwards;
+        }
+
+        @keyframes fadeOutCard {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        input.form-control:focus {
+            border-color: #1f3c88;
+            box-shadow: 0 0 0 0.2rem rgba(31, 60, 136, 0.25);
+        }
+
+        /* Bouton flottant Ajouter */
+        #floating-add-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background-color: #1f3c88;
+            color: white;
+            font-size: 24px;
+            padding: 12px 18px;
+            border-radius: 50%;
+            border: none;
+            z-index: 999;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        #floating-add-btn:hover {
+            transform: scale(1.1);
+        }
+
         /* Animation à l'apparition */
         @keyframes fadeInCard {
             0% {
@@ -89,22 +142,30 @@
                     @csrf
                     @method('PUT')
                     @foreach ($questions as $index => $q)
+                        @php $type = $q['type'] ?? 'qcm'; @endphp
                         <div class="card shadow-sm mb-4 rounded-4 border-0" id="question{{ $index }}">
                             <div class="card-header bg-primary text-white rounded-top-4 d-flex justify-content-between">
                                 <span>{{ trans('panel.question') }} {{ $index + 1 }}</span>
-                                <button type="button" class="btn btn-sm btn-light text-danger delete-question-btn"
-                                    data-index="{{ $index }}">🗑️</button>
+                                <button type="button" class="btn btn-sm btn-light text-danger"
+                                    onclick="deleteQuestion(this)" data-id="{{ $q->id }}">
+                                    🗑️
+                                </button>
+
+
+
 
                             </div>
 
                             <div class="card-body" style="background: #f9f9f9;">
+                                <input type="hidden" name="questions[{{ $index }}][type]"
+                                    value="{{ $type }}">
                                 <div class="mb-3 d-flex align-items-center gap-2">
                                     <label class="form-label mb-0 fw-bold">النقاط :</label>
                                     <input type="number" class="form-control form-control-sm w-25"
                                         name="questions[{{ $index }}][score]" value="{{ $q['score'] ?? 1 }}">
                                 </div>
                                 {{-- Matching --}}
-                                @if ($q['type'] === 'ربط' || $q['type'] === 'arrow')
+                                @if ($type === 'ربط' || $type === 'arrow')
                                     <label class="form-label fw-bold">السؤال</label>
                                     <input type="text" class="form-control mb-3"
                                         name="questions[{{ $index }}][question]"
@@ -135,7 +196,7 @@
                                         </div>
                                     </div>
                                     {{-- Vrai/Faux --}}
-                                @elseif($q['type'] === 'صحيح/خطأ' || $q['type'] === 'binaire')
+                                @elseif ($type === 'صحيح/خطأ' || $type === 'binaire')
                                     <label class="form-label fw-bold">البيان</label>
                                     <input type="text" name="questions[{{ $index }}][question]"
                                         class="form-control mb-3" value="{{ $q['question_text'] ?? '' }}">
@@ -172,7 +233,7 @@
                                         </div>
                                     </div>
                                     {{-- QCM --}}
-                                @elseif($q['type'] === 'اختيار من متعدد' || $q['type'] === 'qcm')
+                                @elseif($type === 'اختيار من متعدد' || $type === 'qcm')
                                     <label class="form-label fw-bold">السؤال</label>
                                     <input type="text" name="questions[{{ $index }}][question]"
                                         class="form-control mb-3" value="{{ $q['question_text'] ?? '' }}">
@@ -267,29 +328,7 @@
                 });
             });
 
-            document.querySelectorAll('.delete-question-btn').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    const index = this.dataset.index;
-                    const card = document.getElementById('question' + index);
-                    const listItem = document.querySelector('.question-item[data-id="question' +
-                        index + '"]');
 
-                    if (card && confirm('هل أنت متأكد من حذف هذا السؤال؟')) {
-                        card.classList.add('fade-out');
-                        setTimeout(() => {
-                            card.remove();
-                            if (listItem) listItem.remove();
-                            updateQuestionNumbers();
-                        }, 300); // ⏳ attendre la fin de l'animation
-                        // ✅ Supprime la carte principale
-
-                        if (listItem) listItem
-                            .remove(); // ✅ Supprime aussi l'entrée dans la liste de droite
-
-                        updateQuestionNumbers(); // 🔁 Met à jour les index et le scroll
-                    }
-                });
-            });
 
 
             // Ajout dynamique de colonnes matching avec bouton de suppression
@@ -343,58 +382,52 @@
 
         function updateQuestionNumbers() {
             const cards = document.querySelectorAll('.card.shadow-sm.mb-4');
-            const listGroup = document.querySelectorAll('.question-item');
             const listContainer = document.querySelector('.list-group.list-group-flush');
 
-            // Supprimer tous les éléments actuels de la liste
-            listGroup.forEach(item => item.remove());
+            // Supprimer tous les anciens éléments de la liste sauf le bouton + إضافة سؤال آخر
+            listContainer.querySelectorAll('.question-item').forEach(item => item.remove());
 
-            // Re-générer proprement la liste
             cards.forEach((card, i) => {
-                const id = 'question' + i;
-                card.id = id;
+                const newId = `question${i}`;
+                card.id = newId;
 
-                // Mettre à jour le titre dans le header
-                const title = card.querySelector('.card-header span');
-                if (title) title.textContent = 'سؤال ' + (i + 1);
+                // Mettre à jour le header du bloc question
+                const header = card.querySelector('.card-header span');
+                if (header) {
+                    header.textContent = `سؤال ${i + 1}`;
+                }
 
-                // Mettre à jour l’index du bouton supprimer
-                const deleteBtn = card.querySelector('.delete-question-btn');
-                if (deleteBtn) deleteBtn.dataset.index = i;
+                // Mettre à jour le bouton delete
+                const deleteBtn = card.querySelector('button[data-id]');
+                if (deleteBtn) {
+                    deleteBtn.dataset.index = i;
+                }
 
-                // Ajouter l’élément dans la liste à droite
+                // Créer l'élément dans la liste de droite
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center question-item';
-                li.setAttribute('data-id', id);
+                li.setAttribute('data-id', newId);
 
                 const a = document.createElement('a');
                 a.href = '#';
                 a.className = 'text-decoration-none text-dark scroll-to';
-                a.dataset.target = id;
-                a.textContent = 'سؤال ' + (i + 1);
+                a.dataset.target = newId;
+                a.textContent = `سؤال ${i + 1}`;
 
+                const scoreInput = card.querySelector('input[name^="questions"][name$="[score]"]');
                 const badge = document.createElement('span');
                 badge.className = 'badge bg-light border';
-                const scoreInput = card.querySelector('input[name^="questions"][name$="[score]"]');
                 badge.textContent = (scoreInput?.value ?? '0') + ' نقاط';
 
                 li.appendChild(a);
                 li.appendChild(badge);
 
-                // Insère avant le bouton "+ إضافة سؤال آخر"
-                const lastItem = listContainer.querySelector('li:last-child');
-                listContainer.insertBefore(li, lastItem);
+                const addButton = listContainer.querySelector('#add-question-btn');
+                listContainer.insertBefore(li, addButton);
             });
 
-            // ✅ Mettre à jour le total dans le header
-            const totalCount = cards.length;
-            const header = document.querySelector('.card-header.bg-white');
-            if (header) {
-                header.innerHTML = `📋 الأسئلة (${totalCount})`;
-            }
-
-            // Rebrancher les événements scroll
-            document.querySelectorAll('.scroll-to').forEach(function(link) {
+            // Rebrancher le scroll-to
+            document.querySelectorAll('.scroll-to').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
                     const targetId = this.dataset.target;
@@ -406,19 +439,19 @@
                         });
                     }
                 });
-            })
-            // Rebrancher les événements de clic pour surligner l'élément actif
-            document.querySelectorAll('.question-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    document.querySelectorAll('.question-item').forEach(i => i.classList.remove('active'));
-                    this.classList.add('active');
-                });
             });
 
+            // Mettre à jour le compteur en haut
+            const totalCount = cards.length;
+            const counterHeader = document.querySelector('.card-header.bg-white');
+            if (counterHeader) {
+                counterHeader.innerHTML = `📋 الأسئلة (${totalCount})`;
+            }
         }
+
         document.getElementById('add-question-btn').addEventListener('click', function() {
             const quizId = {{ $quiz->id }};
-            fetch(`/panel/quizzes/add-question/${quizId}`,  {
+            fetch(`/panel/quizzes/add-question/${quizId}`, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -428,16 +461,82 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        location.reload(); // ou appeler une fonction JS pour insérer dynamiquement
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'تمت إضافة السؤال بنجاح',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => location.reload());
                     } else {
-                        alert(data.error || 'Erreur lors de l’ajout');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'خطأ',
+                            text: data.error || 'حدث خطأ أثناء الإضافة'
+                        });
                     }
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('Erreur AJAX');
-                }); 
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'خطأ في الاتصال',
+                        text: 'تعذر الاتصال بالخادم. الرجاء المحاولة لاحقاً.'
+                    });
+                });
         });
-        
+    </script>
+    <script>
+        function deleteQuestion(button) {
+            const questionId = button.dataset.id;
+            const card = button.closest('.card');
+            const cardId = card.id;
+            const listItem = document.querySelector(`.question-item[data-id="${cardId}"]`);
+
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: 'لن تتمكن من التراجع بعد الحذف!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'نعم، احذفه',
+                cancelButtonText: 'إلغاء'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(`/panel/delete-question/${questionId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            }
+                        })
+                        .then(async res => {
+                            if (!res.ok) throw new Error('Échec de la suppression');
+                            card.classList.add('fade-out');
+                            setTimeout(() => {
+                                card.remove();
+                                if (listItem) listItem.remove();
+                                updateQuestionNumbers(); // ✅ Maintenant placé au bon endroit
+                            }, 300);
+
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'تم الحذف بنجاح',
+                                showConfirmButton: false,
+                                timer: 1200
+                            });
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'خطأ',
+                                text: 'فشل الاتصال بالخادم'
+                            });
+                        });
+                }
+            });
+        }
     </script>
 @endsection

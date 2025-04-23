@@ -69,6 +69,7 @@ class QuizController extends Controller
         $quiz->pdf_path = $path;
         $quiz->teacher_id = auth()->id();
         $quiz->text_content = $textContent; // texte extrait du PDF
+        $quiz->created_by = (int) now()->timestamp;
         $quiz->save();
 
         $quizText = $result['quiz'];
@@ -408,4 +409,22 @@ class QuizController extends Controller
             return back()->withErrors(['error' => 'Erreur lors de la mise à jour du quiz.']);
         }
     }
+    public function drafts()
+{
+    $quizzes = Quiz::orderBy('created_by', 'desc')->get(); // trié par date de création
+    $data = [
+        'quizzes' => $quizzes,
+    ];
+    return view('web.default.panel.quiz.teacher.drafts', $data);
+}
+
+
+public function deleteQuestion($id)
+{
+    $question = Question::findOrFail($id);
+    $question->delete();
+
+    return response()->json(['success' => true]);
+}
+
 }

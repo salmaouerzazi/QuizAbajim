@@ -21,7 +21,7 @@ return [
   'no_result_hint' => 'أنشئ دورتك الأولى ودع الآخرين يتعلمون منك.',
   'choose_webinar' => 'اختر دورة',
   'certificates' => 'شهادات',
-  'quizzes' => 'اختبارات',
+  'quizzes' => 'إنشاء تحدي جديد',
   'financial' => 'مالي',
   'requests' => 'طلبات',
   'support' => 'الدعم',
@@ -443,7 +443,8 @@ return [
     "file_size_exceeded" => "حجم الملف كبير جدا",
     "payment_proof_uploaded_successfully" => "تم تحميل إثبات الدفع بنجاح",
     "wallet" => "محفظة نقودي",
-    "quiz" => "التّحديات",
+    "quiz" => "تّحديات",
     "match_question" => "اربط بسهم",
     "question" => "السؤال",
+    'drafts' => 'المسودات',
 ];
