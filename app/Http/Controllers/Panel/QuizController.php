@@ -387,19 +387,13 @@ class QuizController extends Controller
                 ->where('type', 'arrow')
                 ->get()
                 ->map(function ($q) {
-                    return collect($q->answers)
-                        ->map(fn($a) => trim($a->answer_text) . '=>' . trim($a->matching))
-                        ->sort()
-                        ->implode(';');
+                    return collect($q->answers)->map(fn($a) => trim($a->answer_text) . '=>' . trim($a->matching))->sort()->implode(';');
                 })
                 ->toArray();
             $alreadyAsked = implode('|', $existing_arrows);
         } else {
             // Pour QCM et Vrai/Faux : on vérifie juste le texte de la question
-            $alreadyAsked = Question::where('quiz_id', $quiz->id)
-                ->pluck('question_text')
-                ->filter()
-                ->implode('|');
+            $alreadyAsked = Question::where('quiz_id', $quiz->id)->pluck('question_text')->filter()->implode('|');
         }
         // Appel à l’API Flask
         $response = Http::asForm()->post('http://127.0.0.1:8080/generate_single_question', [
@@ -425,14 +419,7 @@ class QuizController extends Controller
         $isValid = null;
 
         // QCM
-        if (
-            $type === 'qcm' &&
-            preg_match(
-                '/(?:سؤال[:：]?)?\s*(.*?)\s*أ\)\s*(.*?)\s*ب\)\s*(.*?)\s*ج\)\s*(.*?)\s*د\)\s*(.*?)\s*الإجابة الصحيحة[:：]?\s*([أ-ي])/u',
-                $rawQuestionText,
-                $matches
-            )
-        ) {
+        if ($type === 'qcm' && preg_match('/(?:سؤال[:：]?)?\s*(.*?)\s*أ\)\s*(.*?)\s*ب\)\s*(.*?)\s*ج\)\s*(.*?)\s*د\)\s*(.*?)\s*الإجابة الصحيحة[:：]?\s*([أ-ي])/u', $rawQuestionText, $matches)) {
             Log::debug(json_encode($matches, JSON_UNESCAPED_UNICODE));
             $questionText = trim($matches[1]);
             $choices = ['أ' => $matches[2], 'ب' => $matches[3], 'ج' => $matches[4], 'د' => $matches[5]];
@@ -580,11 +567,40 @@ class QuizController extends Controller
     }
     public function drafts()
     {
-        $quizzes = Quiz::orderBy('created_by', 'desc')->get(); // trié par date de création
+        $quizzes = Quiz::orderBy('created_by', 'desc')->paginate(9);
+
+        // 🔁 Ajoute ces lignes :
+        $teacherLevels = UserMatiere::where('teacher_id', auth()->id())
+            ->pluck('level_id')
+            ->toArray();
+        $levels = School_level::whereIn('id', $teacherLevels)->get();
+
+        $teacherMaterials = UserMatiere::where('teacher_id', auth()->id())
+            ->pluck('matiere_id')
+            ->toArray();
+        $materials = Material::whereIn('id', $teacherMaterials)->get();
+
         $data = [
             'quizzes' => $quizzes,
+            'levels' => $levels,
+            'materials' => $materials,
         ];
+
         return view('web.default.panel.quiz.teacher.drafts', $data);
+    }
+
+    public function updateTitle(Request $request)
+    {
+        $request->validate([
+            'quiz_id' => 'required|exists:quiz,id',
+            'title' => 'nullable|string|max:255',
+        ]);
+
+        $quiz = Quiz::findOrFail($request->quiz_id);
+        $quiz->title = $request->title ?: 'تحدي بدون عنوان';
+        $quiz->save();
+
+        return response()->json(['success' => true, 'title' => $quiz->title]);
     }
 
     public function deleteQuestion($id)

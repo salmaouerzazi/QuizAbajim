@@ -17,7 +17,7 @@ class Quiz extends Model
     protected $table = 'quiz';
     protected $guarded = ['id'];
 
-    protected $fillable = ['model_type', 'model_id', 'level_id', 'material_id', 'question_count', 'pdf_path', 'teacher_id', 'created_by', 'updated_by',  'text_content',];
+    protected $fillable = ['title','model_type', 'model_id', 'level_id', 'material_id', 'question_count', 'pdf_path', 'teacher_id', 'created_by', 'updated_by',  'text_content',];
 
     /**
      * Relationship with Level

@@ -106,6 +106,8 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
         Route::delete('/delete-question/{id}', 'QuizController@deleteQuestion')->name('panel.question.delete');
         Route::put('/quizzes/update/{id}', 'QuizController@updateQuiz')->name('panel.quiz.update');
         Route::get('/quizzes/drafts', 'QuizController@drafts')->name('panel.quiz.drafts');
+        Route::post('/quizzes/update-title', 'QuizController@updateTitle')->name('panel.quiz.update.title');
+
 
        
 

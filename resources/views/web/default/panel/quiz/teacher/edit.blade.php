@@ -112,6 +112,13 @@
 
 
     <div class="container-fluid mt-4" dir="rtl">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold">تحدي جديد <small class="text-muted fs-6">أنشئ تحدياتك بسهولة</small></h4>
+            <a href="{{ route('panel.quiz.drafts') }}" class="btn btn-primary px-4">العودة إلى التحديات</a>
+
+        </div>
+
+        {{-- Alerte si aucun quiz --}}
         <div class="row">
             <div class="col-md-3">
                 <div class="card shadow-sm rounded-4">
