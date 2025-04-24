@@ -450,39 +450,66 @@
         }
 
         document.getElementById('add-question-btn').addEventListener('click', function() {
-            const quizId = {{ $quiz->id }};
-            fetch(`/panel/quizzes/add-question/${quizId}`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
+            Swal.fire({
+                title: 'اختر نوع السؤال',
+                input: 'select',
+                inputOptions: {
+                    qcm: 'اختيار من متعدد (QCM)',
+                    binaire: 'صح أو خطأ (Vrai/Faux)',
+                    arrow: 'ربط بسهم (Relier)'
+                },
+                inputPlaceholder: 'اختر نوع السؤال',
+                showCancelButton: true,
+                confirmButtonText: 'تأكيد',
+                cancelButtonText: 'إلغاء',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'يجب اختيار نوع السؤال';
                     }
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'تمت إضافة السؤال بنجاح',
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => location.reload());
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'خطأ',
-                            text: data.error || 'حدث خطأ أثناء الإضافة'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const quizId = {{ $quiz->id }};
+                    const type = result.value;
+
+                    fetch(`/panel/quizzes/add-question/${quizId}`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                type
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'تمت إضافة السؤال بنجاح',
+                                    showConfirmButton: false,
+                                    timer: 1500
+                                }).then(() => location.reload());
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'خطأ',
+                                    text: data.error || 'حدث خطأ أثناء الإضافة'
+                                });
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'خطأ في الاتصال',
+                                text: 'تعذر الاتصال بالخادم. الرجاء المحاولة لاحقاً.'
+                            });
                         });
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'خطأ في الاتصال',
-                        text: 'تعذر الاتصال بالخادم. الرجاء المحاولة لاحقاً.'
-                    });
-                });
+                }
+            });
         });
     </script>
     <script>

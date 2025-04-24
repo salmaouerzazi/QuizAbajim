@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import tempfile
 from utils.pdf_utils import extract_text_from_pdf, detect_language
-from utils.gpt_utils import generate_mixed_quiz
+from utils.gpt_utils import generate_mixed_quiz, generate_single_question_by_type
 import traceback
 
 app = Flask(__name__)
@@ -44,7 +44,24 @@ def generate_quiz():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+@app.route('/generate_single_question', methods=['POST'])
+def generate_single_question():
+    try:
+        text = request.form.get("text", "")
+        qtype = request.form.get("type", "")
+        lang = request.form.get("lang", "arabe")
+        
 
+        if not text or not qtype:
+            return jsonify({"error": "Champ 'text' ou 'type' manquant"}), 400
+
+        already_asked = request.form.get("already_asked", "")
+        question = generate_single_question_by_type(text, qtype, lang, already_asked)
+        return jsonify({"question": question})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Quiz;
+use Illuminate\Support\Facades\Log;
 use App\Models\Question;
 use App\Models\Answer;
 use Illuminate\Support\Facades\DB;
@@ -206,6 +207,11 @@ class QuizController extends Controller
     {
         $rawType = trim(mb_strtolower($rawType));
 
+        // ✅ Gérer les valeurs techniques directement
+        if (in_array($rawType, ['qcm', 'binaire', 'arrow'])) {
+            return $rawType;
+        }
+
         $map = [
             'arabe' => [
                 'ربط' => 'arrow',
@@ -270,102 +276,266 @@ class QuizController extends Controller
     /**
      * ajouter un question .
      */
-    public function addSingleQuestion(Request $request, $id)
+    // public function addSingleQuestion(Request $request, $id)
+    // {
+    //     $quiz = Quiz::findOrFail($id);
+
+    //     $response = Http::asForm()->post('http://127.0.0.1:8080/generate_quiz', [
+    //         'text' => $quiz->text_content,
+    //         'num_questions' => 1,
+    //         'lang' => 'auto',
+    //     ]);
+
+    //     if (!$response->successful()) {
+    //         return response()->json(['error' => 'Erreur IA'], 500);
+    //     }
+    //     $result = $response->json();
+    //     $quizText = $result['quiz'];
+    //     $language = $result['language'];
+    //     $patterns = config('constants.patterns');
+
+    //     preg_match_all($patterns[$language]['question'], $quizText, $matches, PREG_SET_ORDER);
+
+    //     if (empty($matches)) {
+    //         return response()->json(['error' => 'Aucune question détectée'], 400);
+    //     }
+
+    //     $match = $matches[0];
+    //     $type = trim($match[1]);
+    //     $body = trim($match[2]);
+
+    //     $parsedType = $this->normalizeQuestionType($type, $language);
+
+    //     $questionData = [
+    //         'type' => $parsedType,
+    //         'question_text' => '',
+    //         'answers' => [],
+    //         'score' => 4,
+    //     ];
+
+    //     if ($parsedType === 'binaire' && preg_match($patterns[$language]['tf'], $body, $m)) {
+    //         $questionData['question_text'] = trim($m[1]);
+    //         $questionData['is_valid'] = in_array(strtolower($m[2]), ['true', 'vrai', 'صحيح']);
+    //     } elseif ($parsedType === 'qcm' && preg_match($patterns[$language]['mcq'], $body, $m)) {
+    //         $questionBody = trim($m[1]);
+    //         $correct = trim($m[2]);
+    //         $lines = explode("\n", $questionBody);
+    //         $questionData['question_text'] = array_shift($lines);
+
+    //         foreach ($lines as $line) {
+    //             if (preg_match('/^([A-Zأ-ي])\)\s*(.*)/u', trim($line), $opt)) {
+    //                 $questionData['answers'][] = [
+    //                     'answer_text' => trim($opt[2]),
+    //                     'is_valid' => trim($opt[1]) === $correct,
+    //                 ];
+    //             }
+    //         }
+    //     } elseif ($parsedType === 'arrow' && preg_match($patterns[$language]['match'], $body, $m)) {
+    //         $colA = preg_split('/\d+\)/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY);
+    //         $colBText = trim($m[2]);
+
+    //         preg_match_all('/[a-zأ-ي]\)\s*(.+)/u', $colBText, $matchesB);
+    //         $colB = $matchesB[1] ?? [];
+    //         $mapping = explode("\n", trim($m[3]));
+
+    //         foreach ($mapping as $map) {
+    //             if (preg_match('/(\d+)\s*→\s*([^\s]+)/u', trim($map), $link)) {
+    //                 $a = $colA[(int) $link[1] - 1] ?? null;
+    //                 $b = $colB[$this->mapLetterToIndex($link[2], $language)] ?? null;
+    //                 if ($a && $b) {
+    //                     $questionData['answers'][] = [
+    //                         'answer_text' => $a,
+    //                         'matching' => $b,
+    //                     ];
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     // 💾 Sauvegarde en base
+    //     $question = Question::create([
+    //         'quiz_id' => $quiz->id,
+    //         'type' => $questionData['type'],
+    //         'question_text' => $questionData['question_text'],
+    //         'score' => $questionData['score'],
+    //         'is_valid' => $questionData['is_valid'] ?? null,
+    //     ]);
+
+    //     foreach ($questionData['answers'] as $a) {
+    //         Answer::create([
+    //             'question_id' => $question->id,
+    //             'answer_text' => $a['answer_text'] ?? '',
+    //             'is_valid' => $a['is_valid'] ?? null,
+    //             'matching' => $a['matching'] ?? null,
+    //         ]);
+    //     }
+
+    //     return response()->json(['success' => true]);
+    // }
+    public function addGeneratedQuestion(Request $request, $id)
     {
         $quiz = Quiz::findOrFail($id);
+        $rawType = $request->input('type');
 
-        $response = Http::asForm()->post('http://127.0.0.1:8080/generate_quiz', [
+        // Définir la langue et normaliser le type
+        $language = 'arabe';
+        $type = $this->normalizeQuestionType($rawType, $language);
+        if ($type === 'arrow') {
+            // Pour les questions de type Relier : on crée une signature des paires
+            $existing_arrows = Question::with('answers')
+                ->where('quiz_id', $quiz->id)
+                ->where('type', 'arrow')
+                ->get()
+                ->map(function ($q) {
+                    return collect($q->answers)
+                        ->map(fn($a) => trim($a->answer_text) . '=>' . trim($a->matching))
+                        ->sort()
+                        ->implode(';');
+                })
+                ->toArray();
+            $alreadyAsked = implode('|', $existing_arrows);
+        } else {
+            // Pour QCM et Vrai/Faux : on vérifie juste le texte de la question
+            $alreadyAsked = Question::where('quiz_id', $quiz->id)
+                ->pluck('question_text')
+                ->filter()
+                ->implode('|');
+        }
+        // Appel à l’API Flask
+        $response = Http::asForm()->post('http://127.0.0.1:8080/generate_single_question', [
             'text' => $quiz->text_content,
-            'num_questions' => 1,
-            'lang' => 'auto',
+            'type' => $rawType,
+            'lang' => $language,
+            'already_asked' => $alreadyAsked,
         ]);
 
         if (!$response->successful()) {
-            return response()->json(['error' => 'Erreur IA'], 500);
-        }
-        $result = $response->json();
-        $quizText = $result['quiz'];
-        $language = $result['language'];
-        $patterns = config('constants.patterns');
-
-        preg_match_all($patterns[$language]['question'], $quizText, $matches, PREG_SET_ORDER);
-
-        if (empty($matches)) {
-            return response()->json(['error' => 'Aucune question détectée'], 400);
+            return response()->json(['success' => false, 'error' => 'Erreur de génération AI']);
         }
 
-        $match = $matches[0];
-        $type = trim($match[1]);
-        $body = trim($match[2]);
+        $rawQuestionText = $response->json()['question'] ?? '';
+        Log::debug('🧠 Question générée : ' . $rawQuestionText);
 
-        $parsedType = $this->normalizeQuestionType($type, $language);
+        if (!$rawQuestionText) {
+            return response()->json(['success' => false, 'error' => 'Réponse vide du modèle.']);
+        }
 
-        $questionData = [
-            'type' => $parsedType,
-            'question_text' => '',
-            'answers' => [],
-            'score' => 4,
-        ];
+        $questionText = '';
+        $answers = [];
+        $isValid = null;
 
-        if ($parsedType === 'binaire' && preg_match($patterns[$language]['tf'], $body, $m)) {
-            $questionData['question_text'] = trim($m[1]);
-            $questionData['is_valid'] = in_array(strtolower($m[2]), ['true', 'vrai', 'صحيح']);
-        } elseif ($parsedType === 'qcm' && preg_match($patterns[$language]['mcq'], $body, $m)) {
-            $questionBody = trim($m[1]);
-            $correct = trim($m[2]);
-            $lines = explode("\n", $questionBody);
-            $questionData['question_text'] = array_shift($lines);
+        // QCM
+        if (
+            $type === 'qcm' &&
+            preg_match(
+                '/(?:سؤال[:：]?)?\s*(.*?)\s*أ\)\s*(.*?)\s*ب\)\s*(.*?)\s*ج\)\s*(.*?)\s*د\)\s*(.*?)\s*الإجابة الصحيحة[:：]?\s*([أ-ي])/u',
+                $rawQuestionText,
+                $matches
+            )
+        ) {
+            Log::debug(json_encode($matches, JSON_UNESCAPED_UNICODE));
+            $questionText = trim($matches[1]);
+            $choices = ['أ' => $matches[2], 'ب' => $matches[3], 'ج' => $matches[4], 'د' => $matches[5]];
+            $correct = trim($matches[6]);
 
-            foreach ($lines as $line) {
-                if (preg_match('/^([A-Zأ-ي])\)\s*(.*)/u', trim($line), $opt)) {
-                    $questionData['answers'][] = [
-                        'answer_text' => trim($opt[2]),
-                        'is_valid' => trim($opt[1]) === $correct,
-                    ];
+            foreach ($choices as $letter => $text) {
+                $answers[] = [
+                    'answer_text' => $text,
+                    'is_valid' => $letter === $correct ? 1 : 0,
+                    'matching' => null,
+                ];
+            }
+        }
+
+        // Vrai/Faux
+        elseif ($type === 'binaire' && preg_match('/بيان:\s*(.*?)\nالإجابة الصحيحة:\s*(صحيح|خطأ)/u', $rawQuestionText, $matches)) {
+            $questionText = trim($matches[1]);
+            $correctAnswer = trim($matches[2]);
+
+            $answers[] = ['answer_text' => 'صحيح', 'is_valid' => $correctAnswer === 'صحيح' ? 1 : 0, 'matching' => null];
+            $answers[] = ['answer_text' => 'خطأ', 'is_valid' => $correctAnswer === 'خطأ' ? 1 : 0, 'matching' => null];
+            $isValid = $correctAnswer === 'صحيح' ? 1 : 0;
+        }
+
+        // Rattacher (matching)
+        elseif ($type === 'arrow' && preg_match('/العمود أ\s*:\s*(.*?)العمود ب\s*:\s*(.*?)المطابقات\s*:\s*(.*)/us', $rawQuestionText, $matches)) {
+            $colA_raw = trim($matches[1]);
+            $colB_raw = trim($matches[2]);
+
+            // ✅ Extraire les éléments de la colonne A
+            $colA = [];
+            if (preg_match_all('/\d+\)\s*(.+)/u', $colA_raw, $matchesA, PREG_SET_ORDER)) {
+                foreach ($matchesA as $match) {
+                    $colA[] = trim($match[1]);
                 }
             }
-        } elseif ($parsedType === 'arrow' && preg_match($patterns[$language]['match'], $body, $m)) {
-            $colA = preg_split('/\d+\)/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY);
-            $colBText = trim($m[2]);
+            // ✅ Extraire les éléments de la colonne B avec leurs lettres
+            $colB_map = [];
+            if (preg_match_all('/([أ-ي])\)\s*(.+)/u', $colB_raw, $matchesB, PREG_SET_ORDER)) {
+                foreach ($matchesB as $match) {
+                    $letter = trim($match[1]);
+                    $text = trim($match[2]);
+                    $colB_map[$letter] = $text;
+                }
+            }
 
-            preg_match_all('/[a-zأ-ي]\)\s*(.+)/u', $colBText, $matchesB);
-            $colB = $matchesB[1] ?? [];
-            $mapping = explode("\n", trim($m[3]));
+            // ✅ Nettoyer les flèches et parser les correspondances
+            $mapping_raw = str_replace(['→', '➡️', '⇒', '=>', '⟶'], '->', trim($matches[3]));
+            $mappings = array_filter(array_map('trim', explode("\n", $mapping_raw)));
 
-            foreach ($mapping as $map) {
-                if (preg_match('/(\d+)\s*→\s*([^\s]+)/u', trim($map), $link)) {
-                    $a = $colA[(int) $link[1] - 1] ?? null;
-                    $b = $colB[$this->mapLetterToIndex($link[2], $language)] ?? null;
-                    if ($a && $b) {
-                        $questionData['answers'][] = [
-                            'answer_text' => $a,
-                            'matching' => $b,
+            // ✅ Construire les réponses à partir des correspondances
+            foreach ($mappings as $line) {
+                if (preg_match('/(\d+)\s*->\s*([أ-ي])/u', $line, $link)) {
+                    $indexA = (int) $link[1] - 1;
+                    $letterB = trim($link[2]);
+
+                    if (isset($colA[$indexA], $colB_map[$letterB])) {
+                        $answers[] = [
+                            'answer_text' => $colA[$indexA],
+                            'is_valid' => null,
+                            'matching' => $colB_map[$letterB],
                         ];
                     }
                 }
             }
+
+            $questionText = 'اربط العناصر من العمود أ بما يناسبها في العمود ب.';
+            Log::debug('🧩 Réponses arrow générées : ' . json_encode($answers, JSON_UNESCAPED_UNICODE));
         }
 
-        // 💾 Sauvegarde en base
-        $question = Question::create([
-            'quiz_id' => $quiz->id,
-            'type' => $questionData['type'],
-            'question_text' => $questionData['question_text'],
-            'score' => $questionData['score'],
-            'is_valid' => $questionData['is_valid'] ?? null,
-        ]);
+        // Aucun format reconnu
+        else {
+            return response()->json(['success' => false, 'error' => 'Format de question non reconnu.']);
+        }
 
-        foreach ($questionData['answers'] as $a) {
-            Answer::create([
-                'question_id' => $question->id,
-                'answer_text' => $a['answer_text'] ?? '',
-                'is_valid' => $a['is_valid'] ?? null,
-                'matching' => $a['matching'] ?? null,
+        // Sauvegarde en base
+        DB::beginTransaction();
+        try {
+            $question = Question::create([
+                'quiz_id' => $quiz->id,
+                'type' => $type,
+                'question_text' => $questionText,
+                'score' => 4,
+                'is_valid' => $isValid,
             ]);
-        }
 
-        return response()->json(['success' => true]);
+            foreach ($answers as $a) {
+                Answer::create([
+                    'question_id' => $question->id,
+                    'answer_text' => $a['answer_text'],
+                    'is_valid' => $a['is_valid'],
+                    'matching' => $a['matching'],
+                ]);
+            }
+
+            DB::commit();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
+
     public function updateQuiz(Request $request, $id)
     {
         $quiz = Quiz::findOrFail($id);
@@ -402,7 +572,6 @@ class QuizController extends Controller
 
             DB::commit();
             return redirect()->route('panel.quiz.drafts')->with('success', 'تم حفظ الاختبار في المسودات بنجاح.');
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error($e);
@@ -410,21 +579,19 @@ class QuizController extends Controller
         }
     }
     public function drafts()
-{
-    $quizzes = Quiz::orderBy('created_by', 'desc')->get(); // trié par date de création
-    $data = [
-        'quizzes' => $quizzes,
-    ];
-    return view('web.default.panel.quiz.teacher.drafts', $data);
-}
+    {
+        $quizzes = Quiz::orderBy('created_by', 'desc')->get(); // trié par date de création
+        $data = [
+            'quizzes' => $quizzes,
+        ];
+        return view('web.default.panel.quiz.teacher.drafts', $data);
+    }
 
+    public function deleteQuestion($id)
+    {
+        $question = Question::findOrFail($id);
+        $question->delete();
 
-public function deleteQuestion($id)
-{
-    $question = Question::findOrFail($id);
-    $question->delete();
-
-    return response()->json(['success' => true]);
-}
-
+        return response()->json(['success' => true]);
+    }
 }
