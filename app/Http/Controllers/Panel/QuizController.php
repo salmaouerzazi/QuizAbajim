@@ -565,28 +565,30 @@ class QuizController extends Controller
             return back()->withErrors(['error' => 'Erreur lors de la mise à jour du quiz.']);
         }
     }
-    public function drafts()
+    public function drafts(Request $request)
     {
-        $quizzes = Quiz::orderBy('created_by', 'desc')->paginate(9);
+        $query = Quiz::where('teacher_id', auth()->id())->orderBy('created_by', 'desc');
 
-        // 🔁 Ajoute ces lignes :
+        if ($request->filled('search')) {
+            $query->where('title', 'like', '%' . $request->search . '%');
+        }
+
+        $quizzes = $query->paginate(9);
+
+        if ($request->ajax()) {
+            return view('web.default.panel.quiz.teacher.partials.quizzes', compact('quizzes'))->render();
+        }
+
         $teacherLevels = UserMatiere::where('teacher_id', auth()->id())
             ->pluck('level_id')
             ->toArray();
         $levels = School_level::whereIn('id', $teacherLevels)->get();
-
         $teacherMaterials = UserMatiere::where('teacher_id', auth()->id())
             ->pluck('matiere_id')
             ->toArray();
         $materials = Material::whereIn('id', $teacherMaterials)->get();
 
-        $data = [
-            'quizzes' => $quizzes,
-            'levels' => $levels,
-            'materials' => $materials,
-        ];
-
-        return view('web.default.panel.quiz.teacher.drafts', $data);
+        return view('web.default.panel.quiz.teacher.drafts', compact('quizzes', 'levels', 'materials'));
     }
 
     public function updateTitle(Request $request)

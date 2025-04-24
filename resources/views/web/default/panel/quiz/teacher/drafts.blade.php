@@ -26,12 +26,16 @@
                             <option value="{{ $material->name }}">{{ $material->name }}</option>
                         @endforeach
                     </select>
-
+                    
                 </div>
+                <form id="searchForm" class="mb-4 d-flex justify-content-end gap-2 flex-wrap">
+                    <input type="text" name="search" id="searchInput" class="form-control w-auto" placeholder="🔍 ابحث عن تحدي بالعنوان">
+                </form>
             </div>
         </div>
 
-
+       
+        
 
         {{-- 🔔 No Quiz Alert --}}
         @if ($quizzes->isEmpty())
@@ -76,6 +80,26 @@
     </div>
 
     {{-- 🎨 Styles --}}
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const quizContainer = document.getElementById('quizContainer');
+    
+        searchInput.addEventListener('input', function () {
+            const query = this.value;
+    
+            fetch(`{{ route('panel.quiz.drafts') }}?search=${encodeURIComponent(query)}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.text())
+            .then(html => {
+                quizContainer.innerHTML = html;
+            })
+            .catch(err => console.error("Erreur AJAX :", err));
+        });
+    </script>
+    
     <style>
         .custom-select-style {
             border: 1px solid #ccc;
