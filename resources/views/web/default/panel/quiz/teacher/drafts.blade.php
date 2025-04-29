@@ -12,7 +12,7 @@
 
             {{-- 🔍 Filters --}}
             <div class="col-md-6 text-start">
-                <div class="d-flex justify-content-start gap-2 flex-wrap">
+                <div class="d-flex justify-content-start gap-2 flex-wrap align-items-center">
                     <select class="form-select custom-select-style" id="filterLevel">
                         <option value="">🎓 كل المستويات</option>
                         @foreach ($levels as $level)
@@ -26,16 +26,15 @@
                             <option value="{{ $material->name }}">{{ $material->name }}</option>
                         @endforeach
                     </select>
-                    
+
+                    <input type="text" name="search" id="searchInput" class="form-control w-auto custom-select-style"
+                        placeholder="🔍 ابحث عن تحدي بالعنوان">
                 </div>
-                <form id="searchForm" class="mb-4 d-flex justify-content-end gap-2 flex-wrap">
-                    <input type="text" name="search" id="searchInput" class="form-control w-auto" placeholder="🔍 ابحث عن تحدي بالعنوان">
-                </form>
             </div>
         </div>
 
-       
-        
+
+
 
         {{-- 🔔 No Quiz Alert --}}
         @if ($quizzes->isEmpty())
@@ -83,23 +82,48 @@
     <script>
         const searchInput = document.getElementById('searchInput');
         const quizContainer = document.getElementById('quizContainer');
-    
-        searchInput.addEventListener('input', function () {
-            const query = this.value;
-    
-            fetch(`{{ route('panel.quiz.drafts') }}?search=${encodeURIComponent(query)}`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(res => res.text())
-            .then(html => {
-                quizContainer.innerHTML = html;
-            })
-            .catch(err => console.error("Erreur AJAX :", err));
+
+        function loadQuizzes(url = null) {
+            const query = searchInput.value;
+            const fetchUrl = url || `{{ route('panel.quiz.drafts') }}?search=${encodeURIComponent(query)}`;
+
+            fetch(fetchUrl, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(res => res.text())
+                .then(html => {
+                    quizContainer.innerHTML = html;
+                    attachPaginationLinks(); // 🔁 Réattacher les événements sur les liens
+                })
+                .catch(err => console.error("Erreur AJAX :", err));
+        }
+
+        // Recherche instantanée
+        searchInput.addEventListener('input', function() {
+            loadQuizzes(); // recharge les quiz avec le texte de recherche
         });
+
+        // 🔁 Fonction pour intercepter les clics pagination
+        function attachPaginationLinks() {
+            const links = quizContainer.querySelectorAll('.pagination a');
+            links.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const url = this.getAttribute('href');
+                    if (url) {
+                        loadQuizzes(url);
+                    }
+                });
+            });
+        }
+
+        // Initialiser au chargement
+        attachPaginationLinks();
     </script>
-    
+
+
     <style>
         .custom-select-style {
             border: 1px solid #ccc;
@@ -187,7 +211,7 @@
             });
 
             function saveTitle() {
-                const newText = input.value.trim() || 'تحدي بدون عنوان';
+                const newText = input.value.trim() || '✏️ تحدي بدون عنوان';
                 fetch("{{ route('panel.quiz.update.title') }}", {
                         method: 'POST',
                         headers: {
