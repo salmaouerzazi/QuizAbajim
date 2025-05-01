@@ -76,8 +76,8 @@
                                         </ul>
                                     </div>
 
-                                 
-                                    
+
+
                                     <button type="button" class="js-add-chapter btn-transparent text-gray"
                                         data-webinar-id="{{ $webinar->id }}" data-chapter="{{ $chapter->id }}"
                                         data-locale="{{ mb_strtoupper($chapter->locale) }}">
@@ -113,6 +113,7 @@
                                             <ul class="draggable-content-lists draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-drag-class="draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-order-table="webinar_chapter_items">
+
                                                 @foreach ($chapter->chapterItems as $chapterItem)
                                                     @if ($chapterItem->type == \App\Models\WebinarChapterItem::$chapterFile and !empty($chapterItem->file))
                                                         @include(
@@ -123,7 +124,21 @@
                                                                 'chapterItem' => $chapterItem,
                                                             ]
                                                         )
-                                                    @elseif($chapterItem->type == \App\Models\WebinarChapterItem::$chapterQuiz and !empty($chapterItem->quiz))
+
+
+                                                        @foreach ($quizmodel as $q)
+                                                            @if ($q->model_id == $chapter->id)
+                                                                @include(
+                                                                    'web.default.panel.webinar.create_includes.accordions.quiz',
+                                                                    [
+                                                                        'quizInfo' => $q,
+                                                                        'model_id' => $q->model_id,
+                                                                    ]
+                                                                );
+                                                            @endif
+                                                        @endforeach
+                                                    @endif
+                                                    {{-- @elseif($chapterItem->type == \App\Models\WebinarChapterItem::$chapterQuiz and !empty($chapter->model_type)&&$chapter->model_type== 'quiz')
                                                         @include(
                                                             'web.default.panel.webinar.create_includes.accordions.quiz',
                                                             [
@@ -131,8 +146,7 @@
                                                                 'chapter' => $chapter,
                                                                 'chapterItem' => $chapterItem,
                                                             ]
-                                                        )
-                                                    @endif
+                                                        ) --}}
                                                 @endforeach
                                             </ul>
                                         @else
@@ -172,7 +186,7 @@
             </div>
             <div class="modal-body">
                 <select id="quizSelect{{ $chapter->id }}" class="form-control" required>
-                    @foreach($quizzes as $quiz)
+                    @foreach ($quizzes as $quiz)
                         <option value="{{ $quiz->id }}">{{ $quiz->title }}</option>
                     @endforeach
                 </select>
@@ -208,37 +222,36 @@
     <script>
         function assignQuiz(chapterId) {
             const quizId = document.getElementById('quizSelect' + chapterId).value;
-    
+
             fetch("{{ route('panel.quiz.assignToChapter') }}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": "{{ csrf_token() }}"
-                },
-                body: JSON.stringify({
-                    chapter_id: chapterId,
-                    quiz_id: quizId,
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": "{{ csrf_token() }}"
+                    },
+                    body: JSON.stringify({
+                        chapter_id: chapterId,
+                        quiz_id: quizId,
+                    })
                 })
-            })
-            .then(response => {
-                if (!response.ok) throw new Error("Request failed");
-                return response.json();
-            })
-            .then(data => {
-                Swal.fire({
-                    icon: "success",
-                    title: "تم ربط التحدي بنجاح",
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    window.location.reload();
+                .then(response => {
+                    if (!response.ok) throw new Error("Request failed");
+                    return response.json();
+                })
+                .then(data => {
+                    Swal.fire({
+                        icon: "success",
+                        title: "تم ربط التحدي بنجاح",
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    Swal.fire(error.message, "", "error");
                 });
-            })
-            .catch(error => {
-                console.error("Error:", error);
-                Swal.fire(error.message, "", "error");
-            });
         }
     </script>
-    
 @endpush
