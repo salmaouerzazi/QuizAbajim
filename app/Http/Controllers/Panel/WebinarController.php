@@ -555,6 +555,7 @@ class WebinarController extends Controller
         $submaterials = $selectedMaterial ? $selectedMaterial->submaterials : [];
 
         $quizzes = Quiz::where('model_id', '==', 0)->orWhereNull('model_id')->get();
+        $quizmodel = Quiz::where('model_id', '!=', 0)->get();
 
         $data = [
             'pageTitle' => trans('public.edit') . ' ' . $webinar->title,
@@ -567,6 +568,7 @@ class WebinarController extends Controller
             'materials' => $materials,
             'submaterials' => $submaterials,
             'webinar' => $webinar,
+            'quizmodel' => $quizmodel,
             'definedLanguage' => $webinar->translations ? $webinar->translations->pluck('locale')->toArray() : [],
             'materialColors' => $materialColors,
             'quizzes' => $quizzes,

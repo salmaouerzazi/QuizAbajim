@@ -113,8 +113,11 @@
                                             <ul class="draggable-content-lists draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-drag-class="draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-order-table="webinar_chapter_items">
+                                                
                                                 @foreach ($chapter->chapterItems as $chapterItem)
                                                     @if ($chapterItem->type == \App\Models\WebinarChapterItem::$chapterFile and !empty($chapterItem->file))
+                                                  
+                                                   
                                                         @include(
                                                             'web.default.panel.webinar.create_includes.accordions.file',
                                                             [
@@ -123,7 +126,22 @@
                                                                 'chapterItem' => $chapterItem,
                                                             ]
                                                         )
-                                                    @elseif($chapterItem->type == \App\Models\WebinarChapterItem::$chapterQuiz and !empty($chapterItem->quiz))
+                                                      
+                                                       
+                                                            @foreach ($quizmodel as $q)
+                                                            
+                                                                @if($q->model_id ==$chapter->id)
+                                                                    @include('web.default.panel.webinar.create_includes.accordions.quiz',[
+                                                                        'quizInfo' => $q,
+                                                                        'model_id' => $q->model_id,
+                                                                        
+                                                                        
+                                                                
+                                                                    ]); 
+                                                                @endif
+                                                            @endforeach                                                   
+                                                         @endif
+                                                    {{-- @elseif($chapterItem->type == \App\Models\WebinarChapterItem::$chapterQuiz and !empty($chapter->model_type)&&$chapter->model_type== 'quiz')
                                                         @include(
                                                             'web.default.panel.webinar.create_includes.accordions.quiz',
                                                             [
@@ -131,8 +149,8 @@
                                                                 'chapter' => $chapter,
                                                                 'chapterItem' => $chapterItem,
                                                             ]
-                                                        )
-                                                    @endif
+                                                        ) --}}
+   
                                                 @endforeach
                                             </ul>
                                         @else

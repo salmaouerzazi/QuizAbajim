@@ -17,7 +17,7 @@ class Quiz extends Model
     protected $table = 'quiz';
     protected $guarded = ['id'];
 
-    protected $fillable = ['title','status','model_type', 'model_id','chapter_id', 'level_id', 'material_id', 'question_count', 'pdf_path', 'teacher_id', 'created_by', 'updated_by',  'text_content',];
+    protected $fillable = ['title','status','model_type', 'model_id', 'level_id', 'material_id', 'question_count', 'pdf_path', 'teacher_id', 'created_by', 'updated_by',  'text_content',];
 
     /**
      * Relationship with Level
@@ -46,12 +46,8 @@ class Quiz extends Model
         return $this->hasMany(Question::class);
     }
 
-    /**
-     * Relationship with Chapter
-     */
-    public function chapter(){
-        return $this->belongsTo(WebinarChapter::class, 'chapter_id');   
-    }
+    
+    
 
     /**
      * Relationship with model

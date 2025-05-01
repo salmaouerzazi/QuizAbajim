@@ -100,4 +100,5 @@ class WebinarChapter extends Model implements TranslatableContract
     {
         return $this->hasMany(Quiz::class, 'model_id');
     }
+    
 }

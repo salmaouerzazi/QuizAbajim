@@ -255,6 +255,7 @@ class QuizController extends Controller
 
         return null;
     }
+  
 
     /**
      * Afficher la page d'édition des questions générées.
@@ -441,7 +442,7 @@ class QuizController extends Controller
 
             foreach ($request->input('questions') as $qIndex => $qData) {
                 $type = $qData['type'] ?? 'qcm';
-            
+
                 $question = new Question([
                     'quiz_id' => $quiz->id,
                     'type' => $type,
@@ -450,24 +451,25 @@ class QuizController extends Controller
                     'is_valid' => $type === 'binaire' ? ($qData['correct'] === 'true' ? 1 : 0) : null,
                 ]);
                 $question->save();
-            
+
                 // Pour Matching & QCM
                 if (!empty($qData['answers'])) {
                     foreach ($qData['answers'] as $i => $a) {
                         $answerText = trim($a['answer_text'] ?? '');
-                        if ($answerText === '') continue; // 🛡️ Empêche les réponses vides
-            
+                        if ($answerText === '') {
+                            continue;
+                        } // 🛡️ Empêche les réponses vides
+
                         Answer::create([
                             'question_id' => $question->id,
                             'answer_text' => $answerText,
-                            'is_valid' => $type === 'qcm' && isset($qData['correct']) && (string)$qData['correct'] === (string)$i ? 1 : 0,
+                            'is_valid' => $type === 'qcm' && isset($qData['correct']) && (string) $qData['correct'] === (string) $i ? 1 : 0,
                             'matching' => $a['matching'] ?? null,
                         ]);
                     }
                 }
             }
-            
-            
+
             DB::commit();
             return redirect()->route('panel.quiz.drafts')->with('success', 'تم حفظ الاختبار في المسودات بنجاح.');
         } catch (\Exception $e) {
@@ -550,8 +552,25 @@ class QuizController extends Controller
         $quiz = Quiz::findOrFail($request->quiz_id);
         $quiz->model_type = \App\Models\WebinarChapter::class;
         $quiz->model_id = $request->chapter_id;
+        $quiz->status = 'published';
+
         $quiz->save();
         return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+    }
+    public function delete(Request $request)
+    {
+        $quiz = \App\Models\Quiz::findOrFail($request->quiz_id);
 
+        // Désaffecter le quiz
+        $quiz->model_type = null;
+        $quiz->model_id = null;
+
+        //  Remettre en draft car il n'est plus affecté
+        $quiz->status = 'draft';
+
+        // Enregistrer
+        $quiz->save();
+
+        return back()->with('success', 'تم إلغاء ربط التحدي بنجاح.');
     }
 }
