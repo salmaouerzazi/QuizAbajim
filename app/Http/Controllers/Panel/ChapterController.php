@@ -28,7 +28,8 @@ class ChapterController extends Controller
         $chapter = WebinarChapter::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
-
+        $quiz =Quiz::where('model_id', $chapter->id)
+            ->get();
         $locale = $request->get('locale', app()->getLocale());
 
         if (!empty($chapter)) {
@@ -41,7 +42,8 @@ class ChapterController extends Controller
             }
 
             $data = [
-                'chapter' => $chapter
+                'chapter' => $chapter,
+                'quiz' => $quiz,
             ];
 
             return response()->json($data, 200);

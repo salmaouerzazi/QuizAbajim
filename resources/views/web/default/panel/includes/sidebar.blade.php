@@ -184,9 +184,11 @@
                 <span class="font-14 text-dark-blue font-weight-500">{{ trans('panel.my_channel') }}</span>
             </a>
         </li>
-       
+        <li
+            class="sidenav-item {{ (request()->is('panel/webinars') or request()->is('panel/webinars/*')) ? 'sidenav-item-active' : '' }}">
+            <a class="d-flex align-items-center" href="/panel/webinars">
                 <span class="sidenav-item-icon mr-10">
-                    @include('web.default.panel.includes.sidebar_icons.webinars')
+                    <i class="fas fa-chalkboard-teacher" style="color: var(--primary)"></i>
                 </span>
                 <span class="font-14 text-dark-blue font-weight-500">{{ trans('public.additional_courses') }}</span>
             </a>
@@ -263,6 +265,14 @@
                                 <i class="fas fa-question-circle" style="color: var(--primary); font-size: 20px; width: 20px;min-width:0%"></i>
                             </span>
                             <span>{{ trans('panel.quizzes') }}</span>
+                        </a>
+                    </li>
+                    <li class="mt-2 {{ request()->is('panel/quizzes/drafts') ? 'active' : '' }}">
+                        <a href="/panel/quizzes/drafts">
+                            <span class="sidenav-item-icon mr-10">
+                                <i class="fas fa-pencil-alt" style="color: var(--primary); font-size: 18px; width: 20px;min-width:0%"></i>
+                            </span>
+                            <span>{{ trans('panel.drafts') }}</span>
                         </a>
                     </li>
 

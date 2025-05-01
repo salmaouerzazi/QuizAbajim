@@ -96,11 +96,28 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
 
 
         // ------ Quiz routes ----------------------------
-      // routes/web.php OU routes/panel.php (selon ta structure)
+      // routes/panel.php 
 
         Route::get('/quizzes', 'QuizController@indexQuiz')->name('panel.teacher.quiz.index');
         Route::post('/quizzes/generate', 'QuizController@generate')->name('panel.quiz.upload');
         Route::get('/quizzes/edit/{id}', 'QuizController@editQuiz')->name('panel.quiz.edit');
+        Route::post('/quizzes/add-question/{id}', 'QuizController@addGeneratedQuestion')->name('panel.quiz.add_question');
+        Route::delete('/delete-question/{id}', 'QuizController@deleteQuestion')->name('panel.question.delete');
+        Route::put('/quizzes/update/{id}', 'QuizController@updateQuiz')->name('panel.quiz.update');
+        Route::get('/quizzes/drafts', 'QuizController@drafts')->name('panel.quiz.drafts');
+        Route::post('/quizzes/update-title', 'QuizController@updateTitle')->name('panel.quiz.update.title');
+        Route::delete('/quizzes/{id}', 'QuizController@destroy')->name('panel.quiz.destroy');
+        Route::post('/quizzes/assign-to-chapter', 'QuizController@assignToChapter')->name('panel.quiz.assignToChapter');
+        Route::post('/quizzes/delete', 'QuizController@delete')->name('panel.quiz.delete');
+
+        
+
+
+
+
+       
+
+
 
 
 
