@@ -44,20 +44,19 @@ class WebinarController extends Controller
 
     public function course($slug, $justReturnData = true)
     {
-       
         $user = auth()->user();
         $sectionm = SectionMat::where('id', $user->section_id)->pluck('name');
         $levelm = School_level::where('id', $user->level_id)->pluck('name');
         $matieretearcher = Material::where('id', $user->matier_id)->pluck('name');
-        $optiontearcher = Option::where('id', $user->option_id)->pluck('name');          
+        $optiontearcher = Option::where('id', $user->option_id)->pluck('name');
 
-        $matiere =[];
-        if( !empty($user->section_id)){
-        $matiere =Material::where('section_id', $user->section_id)->get();
+        $matiere = [];
+        if (!empty($user->section_id)) {
+            $matiere = Material::where('section_id', $user->section_id)->get();
         }
         if (auth()->check()) {
             $user = auth()->user();
-        } else if (getFeaturesSettings('webinar_private_content_status')) {
+        } elseif (getFeaturesSettings('webinar_private_content_status')) {
             $data = [
                 'pageTitle' => trans('update.private_content'),
                 'pageRobot' => getPageRobotNoIndex(),
@@ -70,50 +69,48 @@ class WebinarController extends Controller
             $data = [
                 'pageTitle' => trans('update.not_access_to_content'),
                 'pageRobot' => getPageRobotNoIndex(),
-                'userNotAccess' => true
+                'userNotAccess' => true,
             ];
 
             return view('web.default.course.private_content', $data);
         }
 
         $course = Webinar::where('slug', $slug)
-        ->when(
-            !$user->isTeacher(),
-            function ($query) {
+            ->when(!$user->isTeacher(), function ($query) {
                 $query->where('status', 'active');
-            }
-        )
-        ->with([
-            'chapters' => function ($query) use ($user) {
-                if (!$user->isTeacher()) {
-                    $query->where('status', WebinarChapter::$chapterActive);
-                }
-                $query->orderBy('order', 'asc');
-                $query->with([
-                    'chapterItems' => function ($query) {
-                        $query->orderBy('order', 'asc');
+            })
+            ->with([
+                'chapters' => function ($query) use ($user) {
+                    if (!$user->isTeacher()) {
+                        $query->where('status', WebinarChapter::$chapterActive);
                     }
-                ]);
-            },
-            'files' => function ($query) use ($user) {
-                if (!$user->isTeacher()) {
-                    $query->where('files.status', WebinarChapter::$chapterActive);
-                }
-                $query->join('webinar_chapters', 'webinar_chapters.id', '=', 'files.chapter_id')
-                    ->select('files.*', DB::raw('webinar_chapters.order as chapterOrder'))
-                    ->orderBy('chapterOrder', 'asc')
-                    ->orderBy('files.order', 'asc')
-                    ->with([
-                        'learningStatus' => function ($query) use ($user) {
-                            $query->where('user_id', $user->id ?? null);
-                        }
+                    $query->orderBy('order', 'asc');
+                    $query->with([
+                        'chapterItems' => function ($query) {
+                            $query->orderBy('order', 'asc');
+                        },
                     ]);
-            },
-            'filterOptions',
-            'teacher',
-        ])
-        ->first();
-    
+                },
+                'files' => function ($query) use ($user) {
+                    if (!$user->isTeacher()) {
+                        $query->where('files.status', WebinarChapter::$chapterActive);
+                    }
+                    $query
+                        ->join('webinar_chapters', 'webinar_chapters.id', '=', 'files.chapter_id')
+                        ->select('files.*', DB::raw('webinar_chapters.order as chapterOrder'))
+                        ->orderBy('chapterOrder', 'asc')
+                        ->orderBy('files.order', 'asc')
+                        ->with([
+                            'learningStatus' => function ($query) use ($user) {
+                                $query->where('user_id', $user->id ?? null);
+                            },
+                        ]);
+                },
+                'filterOptions',
+                'teacher',
+            ])
+            ->first();
+
         if (empty($course)) {
             return $justReturnData ? false : back()->with('error', 'Course not found.');
         }
@@ -122,7 +119,7 @@ class WebinarController extends Controller
             $webinarContentCount += $course->files->count();
         }
         $filesWithoutChapter = $course->files->whereNull('chapter_id');
-        if ($user) {   
+        if ($user) {
             if (!empty($course->chapters) and count($course->chapters)) {
                 foreach ($course->chapters as $chapter) {
                     if (!empty($chapter->chapterItems) and count($chapter->chapterItems)) {
@@ -152,7 +149,6 @@ class WebinarController extends Controller
             'sectionm' => $sectionm,
             'levelm' => $levelm,
             'matiere' => $matiere,
-
         ];
 
         if ($justReturnData) {
@@ -176,10 +172,7 @@ class WebinarController extends Controller
         $canDownloadCertificate = false;
 
         $canTryAgainQuiz = false;
-        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)
-            ->where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)->where('user_id', $user->id)->orderBy('created_at', 'desc')->get();
 
         if (count($userQuizDone)) {
             $quiz->user_grade = $userQuizDone->first()->user_grade;
@@ -200,7 +193,7 @@ class WebinarController extends Controller
             }
         }
 
-        if (!isset($quiz->attempt) or (count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed)) {
+        if (!isset($quiz->attempt) or count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed) {
             $canTryAgainQuiz = true;
         }
 
@@ -236,26 +229,19 @@ class WebinarController extends Controller
             $materialIds = Material::where('name', $request->material_name)->pluck('id');
             $query->whereIn('matiere_id', $materialIds);
         }
-        
-        
 
         if ($request->has('webinar_status') && $request->webinar_status !== 'all') {
             $query->where('status', $request->webinar_status);
         }
-        
 
         $data = $this->makeMyClassAndInvitationsData($query, $user, $request);
         $data['pageTitle'] = trans('webinars.webinars_list_page_title');
 
-
-        return view(getTemplate() . '.panel.webinar.index', $data, 
-        [
-            "level" => $level,
-            "material" => $material
-        ]
-    );
+        return view(getTemplate() . '.panel.webinar.index', $data, [
+            'level' => $level,
+            'material' => $material,
+        ]);
     }
-
 
     public function invitations(Request $request)
     {
@@ -273,7 +259,6 @@ class WebinarController extends Controller
 
         $data = $this->makeMyClassAndInvitationsData($query, $user, $request);
         $data['pageTitle'] = trans('panel.invited_classes');
-        
 
         return view(getTemplate() . '.panel.webinar.index', $data);
     }
@@ -283,15 +268,11 @@ class WebinarController extends Controller
         $user = auth()->user();
 
         if (!empty($user->organ_id)) {
-            $query = Webinar::where('creator_id', $user->organ_id)
-                ->where('status', 'active');
+            $query = Webinar::where('creator_id', $user->organ_id)->where('status', 'active');
 
             $query = $this->organizationClassesFilters($query, $request);
 
-            $webinars = $query
-                ->orderBy('created_at', 'desc')
-                ->orderBy('updated_at', 'desc')
-                ->paginate(10);
+            $webinars = $query->orderBy('created_at', 'desc')->orderBy('updated_at', 'desc')->paginate(10);
 
             $data = [
                 'pageTitle' => trans('panel.organization_classes'),
@@ -328,7 +309,8 @@ class WebinarController extends Controller
             }
 
             if ($sort == 'bestsellers') {
-                $query->whereHas('sales')
+                $query
+                    ->whereHas('sales')
                     ->with('sales')
                     ->get()
                     ->sortBy(function ($qu) {
@@ -337,11 +319,13 @@ class WebinarController extends Controller
             }
 
             if ($sort == 'best_rates') {
-                $query->with([
-                    'reviews' => function ($query) {
-                        $query->where('status', 'active');
-                    }
-                ])->get()
+                $query
+                    ->with([
+                        'reviews' => function ($query) {
+                            $query->where('status', 'active');
+                        },
+                    ])
+                    ->get()
                     ->sortBy(function ($qu) {
                         return $qu->reviews->avg('rates');
                     });
@@ -350,8 +334,7 @@ class WebinarController extends Controller
 
         if (!empty($free) and $free == 'on') {
             $query->where(function ($qu) {
-                $qu->whereNull('price')
-                    ->orWhere('price', '<', '0');
+                $qu->whereNull('price')->orWhere('price', '<', '0');
             });
         }
 
@@ -364,32 +347,27 @@ class WebinarController extends Controller
 
         $onlyNotConducted = $request->get('not_conducted');
         if (!empty($onlyNotConducted)) {
-            $query->where('status', 'active')
-                ->where('start_date', '>', time());
+            $query->where('status', 'active')->where('start_date', '>', time());
         }
 
-        $query->with([
-            'reviews' => function ($query) {
-                $query->where('status', 'active');
-            },
-            'category',
-            'teacher',
-            'sales' => function ($query) {
-                $query->where('type', 'webinar')
-                    ->whereNull('refund_at');
-            }
-        ])->orderBy('updated_at', 'desc');
+        $query
+            ->with([
+                'reviews' => function ($query) {
+                    $query->where('status', 'active');
+                },
+                'category',
+                'teacher',
+                'sales' => function ($query) {
+                    $query->where('type', 'webinar')->whereNull('refund_at');
+                },
+            ])
+            ->orderBy('updated_at', 'desc');
 
         $webinarsCount = $query->count();
 
         $webinars = $query->orderBy('created_at', 'desc')->paginate(9);
 
-        $webinarSales = Sale::where('seller_id', $user->id)
-            ->where('type', 'webinar')
-            ->whereNotNull('webinar_id')
-            ->whereNull('refund_at')
-            ->with('webinar')
-            ->get();
+        $webinarSales = Sale::where('seller_id', $user->id)->where('type', 'webinar')->whereNotNull('webinar_id')->whereNull('refund_at')->with('webinar')->get();
 
         $webinarSalesAmount = 0;
         $courseSalesAmount = 0;
@@ -443,9 +421,7 @@ class WebinarController extends Controller
             return redirect()->back();
         }
 
-        $categories = Category::where('parent_id', null)
-            ->with('subCategories')
-            ->get();
+        $categories = Category::where('parent_id', null)->with('subCategories')->get();
 
         $teachers = null;
         $isOrganization = $user->isOrganization();
@@ -453,8 +429,7 @@ class WebinarController extends Controller
         $webinar = new Webinar();
 
         if ($isOrganization) {
-            $teachers = User::where('role_name', Role::$teacher)
-                ->where('organ_id', $user->id)->get();
+            $teachers = User::where('role_name', Role::$teacher)->where('organ_id', $user->id)->get();
         }
         $levels = School_level::all();
         $materials = Material::get()->unique('name');
@@ -505,7 +480,6 @@ class WebinarController extends Controller
         $this->validate($request, $rules);
         $data = $request->all();
 
-
         if ($request->hasFile('image_cover')) {
             $imagePath = $request->file('image_cover')->store('store', 'public');
             $data['image_cover'] = $imagePath;
@@ -519,26 +493,28 @@ class WebinarController extends Controller
         $webinar = Webinar::create([
             'teacher_id' => $user->isTeacher() ? $user->id : (!empty($data['teacher_id']) ? $data['teacher_id'] : $user->id),
             'creator_id' => $user->id,
-            "thumbnail" => "",
+            'thumbnail' => '',
             'slug' => Webinar::makeSlug($data['title']),
             'private' => (!empty($data['private']) and $data['private'] == 'on') ? true : false,
             'image_cover' => $data['image_cover'],
-            'status' => (!empty($data['draft']) and $data['draft'] == 1)  ? Webinar::$isDraft : Webinar::$pending,
+            'status' => (!empty($data['draft']) and $data['draft'] == 1) ? Webinar::$isDraft : Webinar::$pending,
             'created_at' => time(),
             'type' => 'course',
             'level_id' => $data['level_id'],
             'matiere_id' => $data['material_id'],
             'submaterial_id' => $data['submaterial_id'] ?? null,
         ]);
-        
-        if ($webinar) {
-            WebinarTranslation::updateOrCreate([
-                'webinar_id' => $webinar->id,
-                'locale' => mb_strtolower($data['locale']),
-            ], [
-                'title' => $data['title'],
 
-            ]);
+        if ($webinar) {
+            WebinarTranslation::updateOrCreate(
+                [
+                    'webinar_id' => $webinar->id,
+                    'locale' => mb_strtolower($data['locale']),
+                ],
+                [
+                    'title' => $data['title'],
+                ],
+            );
         }
 
         $url = '/panel/webinars/' . $webinar->id . '/step/1';
@@ -560,12 +536,10 @@ class WebinarController extends Controller
 
         $levels = School_level::all();
         $materials = Material::with('submaterials')->get();
-        
+
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
-                $query->where('creator_id', $user->id)
-                    ->orWhere('teacher_id', $user->id);
-
+                $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
                 $query->orWhereHas('webinarPartnerTeacher', function ($query) use ($user) {
                     $query->where('teacher_id', $user->id);
                 });
@@ -580,6 +554,8 @@ class WebinarController extends Controller
         $selectedMaterial = Material::with('submaterials')->find($webinar->material_id);
         $submaterials = $selectedMaterial ? $selectedMaterial->submaterials : [];
 
+        $quizzes = Quiz::where('model_id', '==', 0)->orWhereNull('model_id')->get();
+
         $data = [
             'pageTitle' => trans('public.edit') . ' ' . $webinar->title,
             'currentStep' => $step,
@@ -593,6 +569,7 @@ class WebinarController extends Controller
             'webinar' => $webinar,
             'definedLanguage' => $webinar->translations ? $webinar->translations->pluck('locale')->toArray() : [],
             'materialColors' => $materialColors,
+            'quizzes' => $quizzes,
         ];
 
         return view(getTemplate() . '.panel.webinar.create', $data);
@@ -601,7 +578,6 @@ class WebinarController extends Controller
     public function update(Request $request, $id)
     {
         $user = auth()->user();
-        
 
         if (!$user->isTeacher()) {
             abort(404);
@@ -609,9 +585,9 @@ class WebinarController extends Controller
 
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
-                $query->where('creator_id', $user->id)
-                    ->orWhere('teacher_id', $user->id);
-            })->first();
+                $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
+            })
+            ->first();
 
         if (empty($webinar)) {
             abort(404);
@@ -624,11 +600,10 @@ class WebinarController extends Controller
             'level_id' => 'required',
             'submaterial_id' => in_array($request->material_id, [1, 4, 5, 12, 17, 22]) ? 'required' : 'sometimes',
         ];
-        
-        $this->validate($request, $rules); 
+
+        $this->validate($request, $rules);
         $data = $request->all();
-        
-            
+
         if ($request->hasFile('image_cover')) {
             $imagePath = $request->file('image_cover')->store('store', 'public');
             $data['image_cover'] = $imagePath;
@@ -644,7 +619,6 @@ class WebinarController extends Controller
             $data['submaterial_id'] = $data['submaterial_id'];
         }
 
-
         $webinar->update([
             'title' => $data['title'],
             'image_cover' => $data['image_cover'],
@@ -656,26 +630,20 @@ class WebinarController extends Controller
         ]);
 
         // Update translation data
-        WebinarTranslation::updateOrCreate([
-            'webinar_id' => $webinar->id,
-            'locale' => "ar",
-        ], [
-            'title' => $data['title'],
-        ]);
+        WebinarTranslation::updateOrCreate(
+            [
+                'webinar_id' => $webinar->id,
+                'locale' => 'ar',
+            ],
+            [
+                'title' => $data['title'],
+            ],
+        );
 
         // Send notification if it's not a draft
         if (empty($data['draft'])) {
-            sendNotification(
-                'notification.course_created',
-                'notification.course_created_msg',
-                $user->id,
-                null,
-                'system',
-                'single',
-                ['title' => $webinar->title] 
-            );
-            
-            }
+            sendNotification('notification.course_created', 'notification.course_created_msg', $user->id, null, 'system', 'single', ['title' => $webinar->title]);
+        }
 
         if (!$isDraft) {
             return redirect('/panel/webinars')->with('show_modal', true);
@@ -692,9 +660,7 @@ class WebinarController extends Controller
             abort(404);
         }
 
-        $webinar = Webinar::where('id', $id)
-            ->where('creator_id', $user->id)
-            ->first();
+        $webinar = Webinar::where('id', $id)->where('creator_id', $user->id)->first();
 
         if (!$webinar) {
             abort(404);
@@ -702,10 +668,13 @@ class WebinarController extends Controller
 
         $webinar->delete();
 
-        return response()->json([
-            'code' => 200,
-            'redirect_to' => $request->get('redirect_to')
-        ], 200);
+        return response()->json(
+            [
+                'code' => 200,
+                'redirect_to' => $request->get('redirect_to'),
+            ],
+            200,
+        );
     }
 
     public function duplicate($id)
@@ -718,8 +687,7 @@ class WebinarController extends Controller
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
                 $query->where(function ($query) use ($user) {
-                    $query->where('creator_id', $user->id)
-                        ->orWhere('teacher_id', $user->id);
+                    $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
                 });
 
                 $query->orWhereHas('webinarPartnerTeacher', function ($query) use ($user) {
@@ -735,7 +703,6 @@ class WebinarController extends Controller
             $description = $webinar->description;
             $seo_description = $webinar->seo_description;
 
-
             $new['created_at'] = time();
             $new['updated_at'] = time();
             $new['status'] = Webinar::$pending;
@@ -750,15 +717,17 @@ class WebinarController extends Controller
 
             $newWebinar = Webinar::create($new);
 
-            WebinarTranslation::updateOrCreate([
-                'webinar_id' => $newWebinar->id,
-                'locale' => mb_strtolower($webinar->locale),
-            ], [
-                'title' => $title,
-                'description' => $description,
-                'seo_description' => $seo_description,
-            ]);
-
+            WebinarTranslation::updateOrCreate(
+                [
+                    'webinar_id' => $newWebinar->id,
+                    'locale' => mb_strtolower($webinar->locale),
+                ],
+                [
+                    'title' => $title,
+                    'description' => $description,
+                    'seo_description' => $seo_description,
+                ],
+            );
 
             return redirect('/panel/webinars/' . $newWebinar->id . '/edit');
         }
@@ -777,8 +746,7 @@ class WebinarController extends Controller
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
                 $query->where(function ($query) use ($user) {
-                    $query->where('creator_id', $user->id)
-                        ->orWhere('teacher_id', $user->id);
+                    $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
                 });
 
                 $query->orWhereHas('webinarPartnerTeacher', function ($query) use ($user) {
@@ -794,8 +762,9 @@ class WebinarController extends Controller
                 ->with([
                     'buyer' => function ($query) {
                         $query->select('id', 'full_name', 'email', 'mobile');
-                    }
-                ])->get();
+                    },
+                ])
+                ->get();
 
             if (!empty($sales) and !$sales->isEmpty()) {
                 $export = new WebinarStudents($sales);
@@ -805,7 +774,7 @@ class WebinarController extends Controller
             $toastData = [
                 'title' => trans('public.request_failed'),
                 'msg' => trans('webinars.export_list_error_not_student'),
-                'status' => 'error'
+                'status' => 'error',
             ];
             return back()->with(['toast' => $toastData]);
         }
@@ -829,9 +798,11 @@ class WebinarController extends Controller
             $webinars = Webinar::select('id', 'teacher_id')
                 ->whereTranslationLike('title', '%' . $term . '%')
                 ->where('id', '<>', $webinarId)
-                ->with(['teacher' => function ($query) {
-                    $query->select('id', 'full_name');
-                }])
+                ->with([
+                    'teacher' => function ($query) {
+                        $query->select('id', 'full_name');
+                    },
+                ])
                 //->where('creator_id', $user->id)
                 ->get();
 
@@ -849,9 +820,7 @@ class WebinarController extends Controller
         $webinarId = $request->get('webinar_id', null);
 
         if (!empty($webinarId)) {
-            $tags = Tag::select('id', 'title')
-                ->where('webinar_id', $webinarId)
-                ->get();
+            $tags = Tag::select('id', 'title')->where('webinar_id', $webinarId)->get();
 
             return response()->json($tags, 200);
         }
@@ -891,7 +860,7 @@ class WebinarController extends Controller
                                 $query->select('id', 'full_name');
                             },
                         ]);
-                    }
+                    },
                 ])
                 ->first();
 
@@ -899,7 +868,7 @@ class WebinarController extends Controller
                 $data = [
                     'pageTitle' => trans('webinars.invoice_page_title'),
                     'sale' => $sale,
-                    'webinar' => $webinar
+                    'webinar' => $webinar,
                 ];
 
                 return view(getTemplate() . '.panel.webinar.invoice', $data);
@@ -915,32 +884,33 @@ class WebinarController extends Controller
         $sectionm = SectionMat::where('id', $user->section_id)->pluck('name');
         $levelm = School_level::where('id', $user->level_id)->pluck('name');
         $matieretearcher = Material::where('id', $user->matier_id)->pluck('name');
-        $optiontearcher = Option::where('id', $user->option_id)->pluck('name');          
+        $optiontearcher = Option::where('id', $user->option_id)->pluck('name');
 
-        $matiere =[];
-        if( !empty($user->section_id)){
-        $matiere =Material::where('section_id', $user->section_id)->get();
+        $matiere = [];
+        if (!empty($user->section_id)) {
+            $matiere = Material::where('section_id', $user->section_id)->get();
         }
         $query = Sale::where('sales.buyer_id', $user->id)
             ->whereNull('sales.refund_at')
             ->where('access_to_purchased_item', true)
             ->where(function ($query) {
                 $query->where(function ($query) {
-                    $query->whereNotNull('sales.webinar_id')
+                    $query
+                        ->whereNotNull('sales.webinar_id')
                         ->where('sales.type', 'webinar')
                         ->whereHas('webinar', function ($query) {
                             $query->where('status', 'active');
                         });
                 });
                 $query->orWhere(function ($query) {
-                    $query->whereNotNull('sales.bundle_id')
+                    $query
+                        ->whereNotNull('sales.bundle_id')
                         ->where('sales.type', 'bundle')
                         ->whereHas('bundle', function ($query) {
                             $query->where('status', 'active');
                         });
                 });
             });
-
 
         $sales = deepClone($query)
             ->with([
@@ -958,7 +928,7 @@ class WebinarController extends Controller
                     $query->withCount([
                         'sales' => function ($query) {
                             $query->whereNull('refund_at');
-                        }
+                        },
                     ]);
                 },
                 'bundle' => function ($query) {
@@ -971,7 +941,7 @@ class WebinarController extends Controller
                             $query->select('id', 'full_name');
                         },
                     ]);
-                }
+                },
             ])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -983,20 +953,13 @@ class WebinarController extends Controller
             })
             ->count();
 
-        $webinarsHours = deepClone($query)->join('webinars', 'webinars.id', 'sales.webinar_id')
-            ->select(DB::raw('sum(webinars.duration) as duration'))
-            ->sum('duration');
-        $bundlesHours = deepClone($query)->join('bundle_webinars', 'bundle_webinars.bundle_id', 'sales.bundle_id')
-            ->join('webinars', 'webinars.id', 'bundle_webinars.webinar_id')
-            ->select(DB::raw('sum(webinars.duration) as duration'))
-            ->sum('duration');
+        $webinarsHours = deepClone($query)->join('webinars', 'webinars.id', 'sales.webinar_id')->select(DB::raw('sum(webinars.duration) as duration'))->sum('duration');
+        $bundlesHours = deepClone($query)->join('bundle_webinars', 'bundle_webinars.bundle_id', 'sales.bundle_id')->join('webinars', 'webinars.id', 'bundle_webinars.webinar_id')->select(DB::raw('sum(webinars.duration) as duration'))->sum('duration');
 
         $hours = $webinarsHours + $bundlesHours;
 
         $time = time();
-        $upComing = deepClone($query)->join('webinars', 'webinars.id', 'sales.webinar_id')
-            ->where('webinars.start_date', '>', $time)
-            ->count();
+        $upComing = deepClone($query)->join('webinars', 'webinars.id', 'sales.webinar_id')->where('webinars.start_date', '>', $time)->count();
 
         $data = [
             'pageTitle' => trans('webinars.webinars_purchases_page_title'),
@@ -1007,9 +970,8 @@ class WebinarController extends Controller
             'levelm' => $levelm,
             'matiere' => $matiere,
             'upComing' => $upComing,
-            'matieretearcher'  => $matieretearcher,
+            'matieretearcher' => $matieretearcher,
             'optiontearcher' => $optiontearcher,
-
         ];
 
         return view(getTemplate() . '.panel.webinar.purchases', $data);
@@ -1026,21 +988,16 @@ class WebinarController extends Controller
         $moreOptions = $request->get('moreOptions', []);
 
         $query->whereHas('teacher', function ($query) {
-            $query->where('status', 'active')
-                ->where(function ($query) {
-                    $query->where('ban', false)
-                        ->orWhere(function ($query) {
-                            $query->whereNotNull('ban_end_at')
-                                ->where('ban_end_at', '<', time());
-                        });
+            $query->where('status', 'active')->where(function ($query) {
+                $query->where('ban', false)->orWhere(function ($query) {
+                    $query->whereNotNull('ban_end_at')->where('ban_end_at', '<', time());
                 });
+            });
         });
 
         if ($this->tableName == 'webinars') {
-
             if (!empty($upcoming) and $upcoming == 'on') {
-                $query->whereNotNull('start_date')
-                    ->where('start_date', '>=', time());
+                $query->whereNotNull('start_date')->where('start_date', '>=', time());
             }
 
             if (!empty($isDownloadable) and $isDownloadable == 'on') {
@@ -1058,8 +1015,7 @@ class WebinarController extends Controller
 
                 if (in_array('certificate_included', $moreOptions)) {
                     $query->whereHas('quizzes', function ($query) {
-                        $query->where('certificate', 1)
-                            ->where('status', 'active');
+                        $query->where('certificate', 1)->where('status', 'active');
                     });
                 }
 
@@ -1071,8 +1027,7 @@ class WebinarController extends Controller
 
                 if (in_array('featured', $moreOptions)) {
                     $query->whereHas('feature', function ($query) {
-                        $query->whereIn('page', ['home_categories', 'categories'])
-                            ->where('status', 'publish');
+                        $query->whereIn('page', ['home_categories', 'categories'])->where('status', 'publish');
                     });
                 }
             }
@@ -1080,8 +1035,7 @@ class WebinarController extends Controller
 
         if (!empty($isFree) and $isFree == 'on') {
             $query->where(function ($qu) {
-                $qu->whereNull('price')
-                    ->orWhere('price', '0');
+                $qu->whereNull('price')->orWhere('price', '0');
             });
         }
 
@@ -1089,9 +1043,7 @@ class WebinarController extends Controller
             $now = time();
             $webinarIdsHasDiscount = [];
 
-            $tickets = Ticket::where('start_date', '<', $now)
-                ->where('end_date', '>', $now)
-                ->get();
+            $tickets = Ticket::where('start_date', '<', $now)->where('end_date', '>', $now)->get();
 
             foreach ($tickets as $ticket) {
                 if ($ticket->isValid()) {
@@ -1099,11 +1051,7 @@ class WebinarController extends Controller
                 }
             }
 
-            $specialOffersWebinarIds = SpecialOffer::where('status', 'active')
-                ->where('from_date', '<', $now)
-                ->where('to_date', '>', $now)
-                ->pluck('webinar_id')
-                ->toArray();
+            $specialOffersWebinarIds = SpecialOffer::where('status', 'active')->where('from_date', '<', $now)->where('to_date', '>', $now)->pluck('webinar_id')->toArray();
 
             $webinarIdsHasDiscount = array_merge($specialOffersWebinarIds, $webinarIdsHasDiscount);
 
@@ -1122,10 +1070,10 @@ class WebinarController extends Controller
             }
 
             if ($sort == 'bestsellers') {
-                $query->leftJoin('sales', function ($join) {
-                    $join->on("{$this->tableName}.id", '=', "sales.{$this->columnId}")
-                        ->whereNull('refund_at');
-                })
+                $query
+                    ->leftJoin('sales', function ($join) {
+                        $join->on("{$this->tableName}.id", '=', "sales.{$this->columnId}")->whereNull('refund_at');
+                    })
                     ->whereNotNull("sales.{$this->columnId}")
                     ->select("{$this->tableName}.*", "sales.{$this->columnId}", DB::raw("count(sales.{$this->columnId}) as salesCounts"))
                     ->groupBy("sales.{$this->columnId}")
@@ -1133,10 +1081,11 @@ class WebinarController extends Controller
             }
 
             if ($sort == 'best_rates') {
-                $query->leftJoin('webinar_reviews', function ($join) {
-                    $join->on("{$this->tableName}.id", '=', "webinar_reviews.{$this->columnId}");
-                    $join->where('webinar_reviews.status', 'active');
-                })
+                $query
+                    ->leftJoin('webinar_reviews', function ($join) {
+                        $join->on("{$this->tableName}.id", '=', "webinar_reviews.{$this->columnId}");
+                        $join->where('webinar_reviews.status', 'active');
+                    })
                     ->whereNotNull('rates')
                     ->select("{$this->tableName}.*", DB::raw('avg(rates) as rates'))
                     ->groupBy("{$this->tableName}.id")
@@ -1145,9 +1094,7 @@ class WebinarController extends Controller
         }
 
         if (!empty($filterOptions) and is_array($filterOptions)) {
-            $webinarIdsFilterOptions = WebinarFilterOption::whereIn('filter_option_id', $filterOptions)
-                ->pluck($this->columnId)
-                ->toArray();
+            $webinarIdsFilterOptions = WebinarFilterOption::whereIn('filter_option_id', $filterOptions)->pluck($this->columnId)->toArray();
 
             $query->whereIn("{$this->tableName}.id", $webinarIdsFilterOptions);
         }
@@ -1160,8 +1107,9 @@ class WebinarController extends Controller
         $level = School_level::all();
         $materials = Material::whereHas('section', function ($query) use ($user) {
             $query->where('level_id', $user->level_id);
-        })->get()->unique('name');
-
+        })
+            ->get()
+            ->unique('name');
 
         $materialColors = [
             'العربية' => '#FFB3BA',
@@ -1172,9 +1120,7 @@ class WebinarController extends Controller
             'الإنجليزية' => '#BAABDA',
         ];
 
-        $webinarsQuery = Webinar::where('webinars.status', 'active')
-            ->where('level_id', $user->level_id)
-            ->where('private', false);
+        $webinarsQuery = Webinar::where('webinars.status', 'active')->where('level_id', $user->level_id)->where('private', false);
 
         $by_material = $request->get('material_name', null);
         if (!empty($by_material)) {
@@ -1184,14 +1130,14 @@ class WebinarController extends Controller
 
         $search = $request->get('search', null);
         if (!empty($search)) {
-            $webinarsQuery->join('webinar_translations', 'webinars.id', '=', 'webinar_translations.webinar_id')
+            $webinarsQuery
+                ->join('webinar_translations', 'webinars.id', '=', 'webinar_translations.webinar_id')
                 ->select('webinars.*', 'webinar_translations.title as title')
                 ->where('webinar_translations.locale', app()->getLocale())
                 ->where(function ($query) use ($search) {
-                    $query->where('webinar_translations.title', 'like', '%' . $search . '%')
-                        ->orWhereHas('teacher', function ($query) use ($search) {
-                            $query->where('full_name', 'like', '%' . $search . '%');
-                        });
+                    $query->where('webinar_translations.title', 'like', '%' . $search . '%')->orWhereHas('teacher', function ($query) use ($search) {
+                        $query->where('full_name', 'like', '%' . $search . '%');
+                    });
                 });
         }
 
@@ -1199,8 +1145,7 @@ class WebinarController extends Controller
 
         $sort = $request->get('sort', null);
         if (empty($sort) || $sort == 'newest') {
-            $webinarsQuery = $webinarsQuery->orderBy("{$this->tableName}.created_at", 'desc')
-                ->orderBy("{$this->tableName}.updated_at", 'desc');
+            $webinarsQuery = $webinarsQuery->orderBy("{$this->tableName}.created_at", 'desc')->orderBy("{$this->tableName}.updated_at", 'desc');
         }
 
         $webinars = $webinarsQuery->with(['tickets'])->paginate(9);
@@ -1226,16 +1171,10 @@ class WebinarController extends Controller
         if (!empty($data['webinar_id'])) {
             $user = auth()->user();
 
-            $checkSale = Sale::where('buyer_id', $user->id)
-                ->where('webinar_id', $data['webinar_id'])
-                ->where('type', 'webinar')
-                ->whereNull('refund_at')
-                ->first();
+            $checkSale = Sale::where('buyer_id', $user->id)->where('webinar_id', $data['webinar_id'])->where('type', 'webinar')->whereNull('refund_at')->first();
 
             if (!empty($checkSale)) {
-                $webinar = Webinar::where('status', 'active')
-                    ->where('id', $data['webinar_id'])
-                    ->first();
+                $webinar = Webinar::where('status', 'active')->where('id', $data['webinar_id'])->first();
 
                 if (!empty($webinar)) {
                     $session = Session::select('id', 'creator_id', 'date', 'link', 'zoom_start_link', 'session_api', 'api_secret')
@@ -1252,10 +1191,13 @@ class WebinarController extends Controller
 
                         $session->link = $session->getJoinLink(true);
 
-                        return response()->json([
-                            'code' => 200,
-                            'session' => $session
-                        ], 200);
+                        return response()->json(
+                            [
+                                'code' => 200,
+                                'session' => $session,
+                            ],
+                            200,
+                        );
                     }
                 }
             }
@@ -1271,14 +1213,14 @@ class WebinarController extends Controller
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
                 $query->where(function ($query) use ($user) {
-                    $query->where('creator_id', $user->id)
-                        ->orWhere('teacher_id', $user->id);
+                    $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
                 });
 
                 $query->orWhereHas('webinarPartnerTeacher', function ($query) use ($user) {
                     $query->where('teacher_id', $user->id);
                 });
-            })->first();
+            })
+            ->first();
 
         if (!empty($webinar)) {
             $session = Session::where('webinar_id', $webinar->id)
@@ -1300,11 +1242,14 @@ class WebinarController extends Controller
                 }
             }
 
-            return response()->json([
-                'code' => 200,
-                'session' => $session,
-                'webinar_id' => $webinar->id,
-            ], 200);
+            return response()->json(
+                [
+                    'code' => 200,
+                    'session' => $session,
+                    'webinar_id' => $webinar->id,
+                ],
+                200,
+            );
         }
 
         return response()->json([], 422);
@@ -1321,10 +1266,13 @@ class WebinarController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response([
-                'code' => 422,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response(
+                [
+                    'code' => 422,
+                    'errors' => $validator->errors(),
+                ],
+                422,
+            );
         }
 
         $tableName = $data['table'];
@@ -1340,28 +1288,28 @@ class WebinarController extends Controller
                     foreach ($itemIds as $order => $id) {
                         Ticket::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'sessions':
                     foreach ($itemIds as $order => $id) {
                         Session::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'files':
                     foreach ($itemIds as $order => $id) {
                         File::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'text_lessons':
                     foreach ($itemIds as $order => $id) {
                         TextLesson::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'prerequisites':
@@ -1370,34 +1318,34 @@ class WebinarController extends Controller
                     foreach ($itemIds as $order => $id) {
                         Prerequisite::where('id', $id)
                             ->whereIn('webinar_id', $webinarIds)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'faqs':
                     foreach ($itemIds as $order => $id) {
                         Faq::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'webinar_chapters':
                     foreach ($itemIds as $order => $id) {
                         WebinarChapter::where('id', $id)
                             ->where('user_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
                 case 'webinar_chapter_items':
                     foreach ($itemIds as $order => $id) {
                         WebinarChapterItem::where('id', $id)
                             ->where('user_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                 case 'bundle_webinars':
                     foreach ($itemIds as $order => $id) {
                         BundleWebinar::where('id', $id)
                             ->where('creator_id', $user->id)
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
 
@@ -1406,7 +1354,7 @@ class WebinarController extends Controller
                         WebinarExtraDescription::where('id', $id)
                             ->where('creator_id', $user->id)
                             ->where('type', 'learning_materials')
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
 
@@ -1415,7 +1363,7 @@ class WebinarController extends Controller
                         WebinarExtraDescription::where('id', $id)
                             ->where('creator_id', $user->id)
                             ->where('type', 'company_logos')
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
 
@@ -1424,16 +1372,15 @@ class WebinarController extends Controller
                         WebinarExtraDescription::where('id', $id)
                             ->where('creator_id', $user->id)
                             ->where('type', 'requirements')
-                            ->update(['order' => ($order + 1)]);
+                            ->update(['order' => $order + 1]);
                     }
                     break;
-
             }
         }
 
         return response()->json([
             'title' => trans('public.request_success'),
-            'msg' => trans('update.items_sorted_successful')
+            'msg' => trans('update.items_sorted_successful'),
         ]);
     }
 
@@ -1448,10 +1395,13 @@ class WebinarController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response([
-                'code' => 422,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response(
+                [
+                    'code' => 422,
+                    'errors' => $validator->errors(),
+                ],
+                422,
+            );
         }
 
         $user = auth()->user();
@@ -1459,17 +1409,16 @@ class WebinarController extends Controller
         $webinar = Webinar::where('id', $id)
             ->where(function ($query) use ($user) {
                 $query->where(function ($query) use ($user) {
-                    $query->where('creator_id', $user->id)
-                        ->orWhere('teacher_id', $user->id);
+                    $query->where('creator_id', $user->id)->orWhere('teacher_id', $user->id);
                 });
 
                 $query->orWhereHas('webinarPartnerTeacher', function ($query) use ($user) {
                     $query->where('teacher_id', $user->id);
                 });
-            })->first();
+            })
+            ->first();
 
         if (!empty($webinar)) {
-
             $itemId = $data['item_id'];
             $locale = $data['locale'];
             $relation = $data['relation'];
@@ -1486,9 +1435,12 @@ class WebinarController extends Controller
                         }
                     }
 
-                    return response()->json([
-                        'item' => $item
-                    ], 200);
+                    return response()->json(
+                        [
+                            'item' => $item,
+                        ],
+                        200,
+                    );
                 }
             }
         }

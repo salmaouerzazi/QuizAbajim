@@ -16,8 +16,8 @@ class AddQuizTable extends Migration
         // Create quiz table
         Schema::create('quiz', function (Blueprint $table) {
             $table->id();
-            $table->string('model_type')->nullable();
-            $table->unsignedInteger('model_id')->nullable();
+            $table->string('model_type'); // App\Models\Webinar
+            $table->unsignedInteger('model_id'); // webinar_id 
             $table->unsignedInteger('level_id');
             $table->unsignedInteger('material_id');
             $table->integer('question_count');
