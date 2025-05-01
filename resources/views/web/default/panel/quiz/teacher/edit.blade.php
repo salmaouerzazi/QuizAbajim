@@ -109,20 +109,34 @@
             color: #1f3c88;
         }
     </style>
+    <style>
+        @media (min-width: 768px) {
+            .sidebar-question-box {
+                position: fixed;
+                width: 18%;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .sidebar-question-box {
+                position: static;
+                width: 100%;
+            }
+        }
+    </style>
 
 
     <div class="container-fluid mt-4" dir="rtl">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4 class="fw-bold">تحدي جديد <small class="text-muted fs-6">أنشئ تحدياتك بسهولة</small></h4>
             <a href="{{ route('panel.quiz.drafts') }}" class="btn btn-primary px-4">العودة إلى التحديات</a>
-
         </div>
-
-        {{-- Alerte si aucun quiz --}}
         <div class="row">
-            <div class="col-md-3">
-                <div class="card shadow-sm rounded-4">
-                    <div class="card-header bg-white text-center fw-bold">📋 الأسئلة ({{ count($questions) }})</div>
+            <div class="col-12 col-md-3">
+                <div class="card shadow-sm rounded-4 sidebar-question-box">
+                    <div class="card-header bg-white text-center fw-bold">
+                        📋 الأسئلة ({{ count($questions) }})
+                    </div>
                     <ul class="list-group list-group-flush">
                         @foreach ($questions as $index => $q)
                             <li class="list-group-item d-flex justify-content-between align-items-center question-item"
@@ -139,7 +153,6 @@
                             data-id="{{ $quiz->id }}">
                             + إضافة سؤال آخر
                         </li>
-
                     </ul>
                 </div>
             </div>
@@ -157,12 +170,7 @@
                                     onclick="deleteQuestion(this)" data-id="{{ $q->id }}">
                                     🗑️
                                 </button>
-
-
-
-
                             </div>
-
                             <div class="card-body" style="background: #f9f9f9;">
                                 <input type="hidden" name="questions[{{ $index }}][type]"
                                     value="{{ $type }}">
@@ -179,24 +187,31 @@
                                         value="{{ $q['question'] ?? trans('panel.match_question') }}">
 
                                     <div class="row">
-                                        <div class="col-md-6" id="column-left-{{ $index }}">
-                                            <label class="form-label fw-bold">العناصر</label>
+                                        <div class="col-md-12" id="matching-rows-{{ $index }}">
+                                            <label class="form-label fw-bold">العناصر والإجابات المطابقة</label>
                                             @foreach ($q['answers'] as $i => $answer)
-                                                <input type="text" class="form-control mb-2"
-                                                    name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
-                                                    value="{{ $answer['answer_text'] ?? '' }}">
+                                                <div class="d-flex align-items-center gap-2 mb-2 answer-item">
+                                                    <input type="text" class="form-control"
+                                                        name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
+                                                        value="{{ $answer['answer_text'] ?? '' }}">
+
+                                                    <input type="text" class="form-control"
+                                                        name="questions[{{ $index }}][answers][{{ $i }}][matching]"
+                                                        value="{{ $answer['matching'] ?? '' }}">
+
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-primary delete-matching-row"
+                                                        style="height: 40px; width: 40px;">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
                                             @endforeach
-                                        </div>
-                                        <div class="col-md-6" id="column-right-{{ $index }}">
-                                            <label class="form-label fw-bold">الإجابات المطابقة</label>
-                                            @foreach ($q['answers'] as $i => $answer)
-                                                <input type="text" class="form-control mb-2"
-                                                    name="questions[{{ $index }}][answers][{{ $i }}][matching]"
-                                                    value="{{ $answer['matching'] ?? '' }}">
-                                            @endforeach
+
+                                        
                                         </div>
                                         <div class="text-end mt-2">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary add-matching-row"
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-secondary add-matching-row"
                                                 data-index="{{ $index }}">
                                                 ➕ إضافة عنصر
                                             </button>
@@ -230,6 +245,7 @@
                                                     {{ $correct === true ? 'checked' : '' }}>
                                                 صحيح
                                             </label>
+
                                             <label
                                                 class="btn btn-outline-primary {{ $correct === false ? 'active' : '' }}">
                                                 <input type="radio" class="d-none"
@@ -238,6 +254,7 @@
                                                 خطأ
                                             </label>
                                         </div>
+
                                     </div>
                                     {{-- QCM --}}
                                 @elseif($type === 'اختيار من متعدد' || $type === 'qcm')
@@ -245,28 +262,50 @@
                                     <input type="text" name="questions[{{ $index }}][question]"
                                         class="form-control mb-3" value="{{ $q['question_text'] ?? '' }}">
                                     <label class="form-label fw-bold">الخيارات</label>
-                                    @foreach ($q['answers'] as $i => $a)
-                                        @php
-                                            $isValid = $a['is_valid'];
-                                        @endphp
-                                        <div class="input-group mb-2">
-                                            <div class="input-group-text">
-                                                <input type="radio" name="questions[{{ $index }}][correct]"
-                                                    value="{{ $a['answer_text'] }}" {{ $isValid ? 'checked' : '' }}>
+                                    <div id="answers-container-{{ $index }}">
+                                        {{-- @foreach ($q['answers'] as $i => $a)
+                                            <div class="input-group mb-2">
+                                                <div class="input-group-text">
+                                                    <input type="radio" name="questions[{{ $index }}][correct]" value="{{ $i }}"
+                                                        {{ $a['is_valid'] ? 'checked' : '' }}>
+                                                </div>
+                                                <input type="text" class="form-control"
+                                                    name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
+                                                    value="{{ $a['answer_text'] }}">
                                             </div>
-                                            <input type="text"
-                                                name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
-                                                class="form-control" value="{{ $a['answer_text'] }}">
-                                        </div>
-                                    @endforeach
-                                    <input type="text" class="form-control mt-2" placeholder="➕ إضافة إجابة جديدة"
-                                        name="questions[{{ $index }}][answers][]">
+                                        @endforeach --}}
+                                        @foreach ($q['answers'] as $i => $a)
+                                            <div class="input-group mb-2 align-items-center answer-item">
+                                                <div class="input-group-text">
+                                                    <input type="radio" name="questions[{{ $index }}][correct]"
+                                                        value="{{ $i }}" {{ $a['is_valid'] ? 'checked' : '' }}>
+                                                </div>
+
+                                                <input type="text" class="form-control"
+                                                    name="questions[{{ $index }}][answers][{{ $i }}][answer_text]"
+                                                    value="{{ $a['answer_text'] ?? '' }}">
+
+                                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    style="height: 40px; width: 40px;"
+                                                    onclick="this.closest('.answer-item').remove()">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        @endforeach
+
+                                    </div>
+                                    <div class="input-group mt-2" id="add-answer-group-{{ $index }}">
+                                        <input type="text" class="form-control"
+                                            id="add-answer-input-{{ $index }}" placeholder="أدخل إجابة جديدة">
+                                        <button class="btn btn-outline-info" style="height:100%" type="button"
+                                            onclick="addAnswer({{ $index }})">➕</button>
+                                    </div>
                                 @endif
                             </div>
                         </div>
                     @endforeach
                     <div class="text-end mt-4">
-                        <button class="btn btn-primary px-5"> حفظ</button>
+                        <button class="btn btn-primary px-5 w-25"> حفظ</button>
                     </div>
                 </form>
             </div>
@@ -274,48 +313,73 @@
     </div>
 
     <script>
-        document.querySelectorAll('input[placeholder="➕ إضافة إجابة جديدة"]').forEach(function(input) {
+        function addAnswer(index) {
+            const input = document.getElementById(`add-answer-input-${index}`);
+            const value = input.value.trim();
+            if (value === '') return;
+
+            const container = document.getElementById(`answers-container-${index}`);
+            const inputs = container.querySelectorAll('input[name^="questions"][name$="[answer_text]"]');
+            const newIndex = inputs.length;
+
+            const inputGroup = document.createElement('div');
+            inputGroup.className = 'input-group mb-2';
+
+            const radioDiv = document.createElement('div');
+            radioDiv.className = 'input-group-text';
+
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = `questions[${index}][correct]`;
+            radio.value = newIndex;
+            radioDiv.appendChild(radio);
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.className = 'form-control';
+            textInput.name = `questions[${index}][answers][${newIndex}][answer_text]`;
+            textInput.value = value;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'btn btn-sm btn-outline-primary';
+            deleteBtn.style.height = '40px';
+            deleteBtn.style.width = '20px';
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.onclick = function(e) {
+                e.preventDefault();
+                wrapper.remove();
+            };
+
+            inputGroup.appendChild(radioDiv);
+            inputGroup.appendChild(textInput);
+            inputGroup.appendChild(deleteBtn);
+
+            container.appendChild(inputGroup);
+            input.value = '';
+            textInput.focus();
+        }
+        document.querySelectorAll('[id^="add-answer-input-"]').forEach(function(input) {
             input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && input.value.trim() !== '') {
+                if (e.key === 'Enter') {
                     e.preventDefault();
-
-                    const value = input.value.trim();
-                    const parent = input.closest('.card-body');
-                    const inputs = parent.querySelectorAll(
-                        'input[name^="questions"][name$="[answer_text]"]');
-                    const index = inputs.length;
-
-                    const inputGroup = document.createElement('div');
-                    inputGroup.className = 'input-group mb-2';
-
-                    const radioDiv = document.createElement('div');
-                    radioDiv.className = 'input-group-text';
-
-                    const radio = document.createElement('input');
-                    radio.type = 'radio';
-                    radio.name = input.name.replace('answers[]', 'correct');
-                    radio.value = value;
-                    radioDiv.appendChild(radio);
-
-                    const textInput = document.createElement('input');
-                    textInput.type = 'text';
-                    textInput.className = 'form-control';
-                    textInput.name = input.name.replace('[]', `[${index}][answer_text]`);
-                    textInput.value = value;
-
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.type = 'button';
-                    deleteBtn.className = 'btn btn-sm btn-outline-danger';
-                    deleteBtn.innerHTML = '🗑️';
-                    deleteBtn.onclick = () => inputGroup.remove();
-
-                    inputGroup.appendChild(radioDiv);
-                    inputGroup.appendChild(textInput);
-                    inputGroup.appendChild(deleteBtn);
-
-                    input.before(inputGroup);
-                    input.value = '';
+                    const index = this.id.split('-').pop();
+                    addAnswer(index);
                 }
+            });
+        });
+
+        document.querySelectorAll('div[role="group"]').forEach(group => {
+            const labels = group.querySelectorAll('label');
+            labels.forEach(label => {
+                label.addEventListener('click', () => {
+                    labels.forEach(l => l.classList.remove('active'));
+                    label.classList.add('active');
+                    const radio = label.querySelector('input[type="radio"]');
+                    if (radio) {
+                        radio.checked = true;
+                    }
+                });
             });
         });
 
@@ -336,54 +400,61 @@
             });
 
 
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.delete-matching-row')) {
+                    const row = e.target.closest('.answer-item');
+                    if (row) row.remove();
+                }
+            });
 
 
             // Ajout dynamique de colonnes matching avec bouton de suppression
             document.querySelectorAll('.add-matching-row').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     const index = this.dataset.index;
-                    const leftCol = document.getElementById('column-left-' + index);
-                    const rightCol = document.getElementById('column-right-' + index);
+                    const container = document.getElementById('matching-rows-' + index);
 
-                    const count = leftCol.querySelectorAll('.form-control').length;
+                    const count = container.querySelectorAll('.answer-item').length;
 
-                    // Créer ligne à gauche (élément)
-                    const leftWrapper = document.createElement('div');
-                    leftWrapper.className = 'd-flex align-items-center gap-2 mb-2';
+                    // Créer le wrapper pour la ligne complète (élément + réponse + bouton 🗑️)
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'd-flex align-items-center gap-2 mb-2 answer-item';
 
+                    // Input pour l'élément (gauche)
                     const inputLeft = document.createElement('input');
                     inputLeft.type = 'text';
                     inputLeft.className = 'form-control';
                     inputLeft.name = `questions[${index}][answers][${count}][answer_text]`;
 
-                    leftWrapper.appendChild(inputLeft);
-                    leftCol.appendChild(leftWrapper);
-
-                    // Créer ligne à droite (réponse + bouton 🗑️)
-                    const rightWrapper = document.createElement('div');
-                    rightWrapper.className = 'd-flex align-items-center gap-2 mb-2';
-
+                    // Input pour la réponse correspondante (droite)
                     const inputRight = document.createElement('input');
                     inputRight.type = 'text';
                     inputRight.className = 'form-control';
                     inputRight.name = `questions[${index}][answers][${count}][matching]`;
 
+                    // Bouton de suppression
                     const deleteBtn = document.createElement('button');
                     deleteBtn.type = 'button';
-                    deleteBtn.className = 'btn btn-sm btn-outline-danger';
-                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.className = 'btn btn-sm btn-outline-primary delete-matching-row';
+                    deleteBtn.style.height = '40px';
+                    deleteBtn.style.width = '40px';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
 
-                    // Supprimer les deux lignes (gauche et droite)
-                    deleteBtn.onclick = () => {
-                        leftCol.removeChild(leftWrapper);
-                        rightCol.removeChild(rightWrapper);
+                    // Supprimer la ligne
+                    deleteBtn.onclick = function() {
+                        wrapper.remove();
                     };
 
-                    rightWrapper.appendChild(inputRight);
-                    rightWrapper.appendChild(deleteBtn);
-                    rightCol.appendChild(rightWrapper);
+                    // Ajouter tout dans la ligne
+                    wrapper.appendChild(inputLeft);
+                    wrapper.appendChild(inputRight);
+                    wrapper.appendChild(deleteBtn);
+
+                    // Ajouter la ligne dans le container
+                    container.appendChild(wrapper);
                 });
             });
+
 
         });
 
@@ -550,7 +621,7 @@
                             setTimeout(() => {
                                 card.remove();
                                 if (listItem) listItem.remove();
-                                updateQuestionNumbers(); // ✅ Maintenant placé au bon endroit
+                                updateQuestionNumbers();
                             }, 300);
 
 

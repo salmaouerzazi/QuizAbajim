@@ -98,7 +98,7 @@
 
     @if (!empty($webinar))
         <div class="p-30 d-flex rounded-sm align-items-center justify-content-between panel-header"
-            style="background-color: {{ $materialColors[$webinar->material->name] ?? '#000' }}">
+            style="background-color:  #ffffff;">
             <h1 class="section-title">
                 {{ $webinar->title }}
             </h1>

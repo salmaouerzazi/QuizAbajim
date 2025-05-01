@@ -439,28 +439,35 @@ class QuizController extends Controller
                 $q->delete();
             }
 
-            foreach ($request->input('questions') as $qData) {
+            foreach ($request->input('questions') as $qIndex => $qData) {
+                $type = $qData['type'] ?? 'qcm';
+            
                 $question = new Question([
                     'quiz_id' => $quiz->id,
-                    'type' => $qData['type'] ?? 'qcm',
+                    'type' => $type,
                     'question_text' => $qData['question'] ?? $qData['question_text'],
                     'score' => $qData['score'] ?? 1,
-                    'is_valid' => isset($qData['correct']) ? ($qData['correct'] === 'true' ? 1 : 0) : null,
+                    'is_valid' => $type === 'binaire' ? ($qData['correct'] === 'true' ? 1 : 0) : null,
                 ]);
                 $question->save();
-
+            
+                // Pour Matching & QCM
                 if (!empty($qData['answers'])) {
-                    foreach ($qData['answers'] as $a) {
+                    foreach ($qData['answers'] as $i => $a) {
+                        $answerText = trim($a['answer_text'] ?? '');
+                        if ($answerText === '') continue; // 🛡️ Empêche les réponses vides
+            
                         Answer::create([
                             'question_id' => $question->id,
-                            'answer_text' => $a['answer_text'] ?? '',
-                            'is_valid' => $a['is_valid'] ?? null,
+                            'answer_text' => $answerText,
+                            'is_valid' => $type === 'qcm' && isset($qData['correct']) && (string)$qData['correct'] === (string)$i ? 1 : 0,
                             'matching' => $a['matching'] ?? null,
                         ]);
                     }
                 }
             }
-
+            
+            
             DB::commit();
             return redirect()->route('panel.quiz.drafts')->with('success', 'تم حفظ الاختبار في المسودات بنجاح.');
         } catch (\Exception $e) {
@@ -472,6 +479,9 @@ class QuizController extends Controller
     public function drafts(Request $request)
     {
         $query = Quiz::where('teacher_id', auth()->id())->orderBy('created_by', 'desc');
+        if ($request->filled('status')) {
+            $query->where('status', $request->status); // 'draft' ou 'published'
+        }
 
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
@@ -515,5 +525,33 @@ class QuizController extends Controller
         $question->delete();
 
         return response()->json(['success' => true]);
+    }
+    public function destroy($id)
+    {
+        $quiz = Quiz::where('teacher_id', auth()->id())->findOrFail($id);
+
+        // Supprimer les questions et réponses associées
+        foreach ($quiz->questions as $question) {
+            $question->answers()->delete();
+            $question->delete();
+        }
+
+        $quiz->delete();
+
+        return redirect()->route('panel.quiz.drafts')->with('success', 'تم حذف التحدي بنجاح.');
+    }
+    public function assignToChapter(Request $request)
+    {
+        $request->validate([
+            'quiz_id' => 'required|exists:quiz,id',
+            'chapter_id' => 'required|exists:webinar_chapters,id',
+        ]);
+
+        $quiz = Quiz::findOrFail($request->quiz_id);
+        $quiz->model_type = \App\Models\WebinarChapter::class;
+        $quiz->model_id = $request->chapter_id;
+        $quiz->save();
+        return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+
     }
 }
