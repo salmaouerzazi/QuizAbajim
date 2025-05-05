@@ -10,7 +10,8 @@
                         <h6 class="text-muted">كل الاختبارات التي قمت بإنشائها</h6>
                     </div>
 
-                    <div class="col-12 col-md-9 d-flex p-2 justify-content-center align-items-center" style="flex-wrap: wrap;gap:3px">
+                    <div class="col-12 col-md-9 d-flex p-2 justify-content-center align-items-center"
+                        style="flex-wrap: wrap;gap:3px">
 
                         <input type="text" name="search" id="searchInput" class="filter-input ml-2"
                             placeholder="🔍 ابحث عن تحدي بالعنوان">
@@ -80,8 +81,8 @@
                     .then(html => {
                         document.getElementById('quizWrapper').innerHTML = html;
 
-                        attachPaginationLinks(); 
-                        applyFilters(); 
+                        attachPaginationLinks();
+                        applyFilters();
                     })
                     .catch(err => console.error("Erreur AJAX :", err));
             }
@@ -111,7 +112,6 @@
 
 
         <style>
-            /* 🧼 Container global (optionnel) */
             .filter-bar {
                 background-color: #ffffff;
                 box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -119,7 +119,7 @@
 
             }
 
-            /* 🎛️ Style unifié pour les <select> et <input> */
+            /*  Style unifié pour les <select> et <input> */
             .filter-select,
             .filter-input {
                 background-color: #f4f8fc;
@@ -135,7 +135,7 @@
                 transition: all 0.2s ease-in-out;
             }
 
-            /* 🧲 Au focus : border et halo */
+            /* Au focus : border et halo */
             .filter-select:focus,
             .filter-input:focus {
                 outline: none;
@@ -143,7 +143,7 @@
                 box-shadow: 0 0 0 2px rgba(16, 69, 104, 0.2);
             }
 
-            /* 📲 Responsive comportement (wrap automatique) */
+            /*  Responsive comportement (wrap automatique) */
 
 
             .quiz-status-badge {
@@ -175,6 +175,13 @@
                 color: #fff;
             }
 
+            .dropdown-menu {
+                z-index: 5000 !important;
+                border-radius: 12px;
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+                padding: 8px 0;
+            }
+
             .dropdown-menu .dropdown-item {
                 font-size: 15px;
                 padding: 10px 15px;
@@ -184,6 +191,7 @@
             .dropdown-menu .dropdown-item:last-child {
                 border-bottom: none;
             }
+
 
             .custom-select-style {
                 border: 1px solid #ccc;
@@ -223,8 +231,8 @@
             }
 
             .quiz-card:hover {
-                transform: scale(1.03);
                 box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+                
             }
 
             .bg-lightblue {
@@ -249,7 +257,7 @@
             }
         </style>
 
-        {{-- ✏️ JS: Inline Editing & Filtering --}}
+        {{-- JS: Inline Editing & Filtering --}}
         <script>
             function enableTitleEdit(element) {
                 const quizId = element.dataset.id;
@@ -300,7 +308,7 @@
                 }
             }
 
-            // 🔍 Client-side filtering
+            //  Client-side filtering
             const levelFilter = document.getElementById('filterLevel');
             const materialFilter = document.getElementById('filterMaterial');
             const cards = document.querySelectorAll('.quiz-card-wrapper');

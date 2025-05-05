@@ -24,6 +24,34 @@
                 <div class="quiz-status-badge {{ $quiz->status === 'published' ? 'published' : 'draft' }}">
                     {{ $quiz->status === 'published' ? 'منشور' : 'مسودة' }}
                 </div>
+                <div class="position-absolute top-0 end-0 m-2 z-3">
+                    <div class="dropdown">
+                        <button class="btn btn-sm p-0 text-dark" type="button" id="dropdownMenu{{ $quiz->id }}"
+                            data-bs-toggle="dropdown" aria-expanded="false"  onclick="event.stopPropagation()">
+                            <i class="bi bi-three-dots-vertical fs-5"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm text-end"
+                            aria-labelledby="dropdownMenu{{ $quiz->id }}">
+                            <li>
+                                <a class="dropdown-item d-flex justify-content-between align-items-center"
+                                    href="{{ route('panel.quiz.edit', $quiz->id) }}">
+                                    تعديل <i class="bi bi-pencil"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <form action="{{ route('panel.quiz.destroy', $quiz->id) }}" method="POST"
+                                    onsubmit="return confirm('هل أنت متأكد من حذف هذا التحدي؟')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                        class="dropdown-item d-flex justify-content-between align-items-center text-danger">
+                                        حذف <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
                 <div class="card-body text-center bg-lightblue rounded-bottom-4">
                     <h6 class="quiz-title fw-bold text-dark mb-1" title="انقر لتعديل العنوان"
                         onclick="event.stopPropagation(); enableTitleEdit(this)" data-id="{{ $quiz->id }}">
@@ -49,3 +77,4 @@
         {{ $quizzes->appends(request()->only('search'))->links('vendor.pagination.custom') }}
     </div>
 </div>
+
