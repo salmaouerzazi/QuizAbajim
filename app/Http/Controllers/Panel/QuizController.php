@@ -68,6 +68,8 @@ class QuizController extends Controller
         $quiz->material_id = $request->input('subject');
         $quiz->question_count = $request->input('num_questions', 5);
         $quiz->pdf_path = $path;
+        $quiz->title = $request->input('title', 'تحدي بدون عنوان');
+        $quiz->status = 'draft';
         $quiz->teacher_id = auth()->id();
         $quiz->text_content = $textContent; // texte extrait du PDF
         $quiz->created_by = (int) now()->timestamp;
@@ -371,11 +373,11 @@ class QuizController extends Controller
                 }
             }
 
-            // ✅ Nettoyer les flèches et parser les correspondances
+            //  Nettoyer les flèches et parser les correspondances
             $mapping_raw = str_replace(['→', '➡️', '⇒', '=>', '⟶'], '->', trim($matches[3]));
             $mappings = array_filter(array_map('trim', explode("\n", $mapping_raw)));
 
-            // ✅ Construire les réponses à partir des correspondances
+            //  Construire les réponses à partir des correspondances
             foreach ($mappings as $line) {
                 if (preg_match('/(\d+)\s*->\s*([أ-ي])/u', $line, $link)) {
                     $indexA = (int) $link[1] - 1;

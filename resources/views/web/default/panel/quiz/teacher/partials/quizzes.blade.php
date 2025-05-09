@@ -20,14 +20,14 @@
         <div class="col-md-4 col-12 mb-4 quiz-card-wrapper" data-level="{{ $levelName }}"
             data-material="{{ $materialName }}" data-statues="{{ $quiz->status }}">
             <div class="card quiz-card rounded-4 shadow-sm position-relative"
-                onclick="window.location.href='{{ route('panel.quiz.edit', $quiz->id) }}'">
+                >
                 <div class="quiz-status-badge {{ $quiz->status === 'published' ? 'published' : 'draft' }}">
                     {{ $quiz->status === 'published' ? 'منشور' : 'مسودة' }}
                 </div>
                 <div class="position-absolute top-0 end-0 m-2 z-3">
                     <div class="dropdown">
                         <button class="btn btn-sm p-0 text-dark" type="button" id="dropdownMenu{{ $quiz->id }}"
-                            data-bs-toggle="dropdown" aria-expanded="false"  onclick="event.stopPropagation()">
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-three-dots-vertical fs-5"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm text-end"
@@ -39,11 +39,10 @@
                                 </a>
                             </li>
                             <li>
-                                <form action="{{ route('panel.quiz.destroy', $quiz->id) }}" method="POST"
-                                    onsubmit="return confirm('هل أنت متأكد من حذف هذا التحدي؟')">
+                                <form action="{{ route('panel.quiz.destroy', $quiz->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit"
+                                    <button type="submit" onclick="deleteQuiz(event, {{ $quiz->id }})"
                                         class="dropdown-item d-flex justify-content-between align-items-center text-danger">
                                         حذف <i class="bi bi-trash"></i>
                                     </button>
@@ -77,4 +76,18 @@
         {{ $quizzes->appends(request()->only('search'))->links('vendor.pagination.custom') }}
     </div>
 </div>
+@push('scripts_bottom')
 
+<script>
+    function deleteQuiz(event, quizId) {
+        event.preventDefault();
+        if (confirm('هل أنت متأكد أنك تريد حذف هذا الاختبار؟')) {
+            
+            const form = event.target.closest('form');
+            form.submit();
+        }
+    }
+
+</script>
+
+@endpush

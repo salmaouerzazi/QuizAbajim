@@ -12,7 +12,7 @@ def home():
 @app.route('/generate_quiz', methods=['POST'])
 def generate_quiz():
     try:
-        # ✅ Priorité au champ text si présent
+        # Priorité au champ text si présent
         if 'text' in request.form:
             text = request.form['text']
         elif 'pdf' in request.files:

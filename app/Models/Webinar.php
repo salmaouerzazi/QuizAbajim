@@ -148,10 +148,7 @@ class Webinar extends Model implements TranslatableContract
         return $this->hasMany('App\Models\Prerequisite', 'webinar_id', 'id');
     }
 
-    public function quizzes()
-    {
-        return $this->hasMany('App\Models\Quiz', 'webinar_id', 'id');
-    }
+
 
     public function webinarPartnerTeacher()
     {
@@ -555,75 +552,6 @@ class Webinar extends Model implements TranslatableContract
             'passed' => $passed,
             'count' => count($assignments)
         ];
-    }
-
-    public function getQuizzesLearningProgressStat($userId = null)
-    {
-        $passed = 0;
-
-        if (empty($userId)) {
-            $userId = auth()->id();
-        }
-
-        $quizzes = $this->quizzes()
-            ->where('status', 'active')
-            ->get();
-
-        foreach ($quizzes as $quiz) {
-            $quizHistory = QuizzesResult::where('quiz_id', $quiz->id)
-                ->where('user_id', $userId)
-                ->where('status', QuizzesResult::$passed)
-                ->first();
-
-            if (!empty($quizHistory)) {
-                $passed += 1;
-            }
-        }
-
-        return [
-            'passed' => $passed,
-            'count' => count($quizzes)
-        ];
-    }
-
-    public function getProgress($isLearningPage = false)
-    {
-        $progress = 0;
-
-        if (
-            auth()->check() and
-            $this->checkUserHasBought() and
-            (
-                !$this->isWebinar() or
-                ($this->isWebinar() and $this->isProgressing()) or
-                $isLearningPage
-            )
-        ) {
-            $user_id = auth()->id();
-
-            $filesStat = $this->getFilesLearningProgressStat($user_id);
-            $sessionsStat = $this->getSessionsLearningProgressStat($user_id);
-            $textLessonsStat = $this->getTextLessonsLearningProgressStat($user_id);
-            $assignmentsStat = $this->getAssignmentsLearningProgressStat($user_id);
-            $quizzesStat = $this->getQuizzesLearningProgressStat($user_id);
-
-            $passed = $filesStat['passed'] + $sessionsStat['passed'] + $textLessonsStat['passed'] + $assignmentsStat['passed'] + $quizzesStat['passed'];
-            $count = $filesStat['count'] + $sessionsStat['count'] + $textLessonsStat['count'] + $assignmentsStat['count'] + $quizzesStat['count'];
-
-            if ($passed > 0 and $count > 0) {
-                $progress = ($passed * 100) / $count;
-
-                $this->handleLearningProgress100Reward($progress, $user_id, $this->id);
-            }
-        } else if ($this->isWebinar() and !empty($this->capacity)) {
-            $salesCount = !empty($this->sales_count) ? $this->sales_count : $this->sales()->count();
-
-            if ($salesCount > 0) {
-                $progress = ($salesCount * 100) / $this->capacity;
-            }
-        }
-
-        return round($progress, 2);
     }
 
     private function handleLearningProgress100Reward($progress, $userId, $itemId)

@@ -55,11 +55,6 @@ class WebinarChapter extends Model implements TranslatableContract
         return $this->hasMany('App\Models\WebinarAssignment', 'chapter_id', 'id');
     }
 
-    public function quizzes()
-    {
-        return $this->hasMany('App\Models\Quiz', 'chapter_id', 'id');
-    }
-
     public function chapterItems()
     {
         return $this->hasMany('App\Models\WebinarChapterItem', 'chapter_id', 'id');
@@ -89,10 +84,6 @@ class WebinarChapter extends Model implements TranslatableContract
         $count += $this->sessions->where('status', 'active')->count();
         $count += $this->textLessons->where('status', 'active')->count();
         $count += $this->assignments->where('status', 'active')->count();
-
-        if ($withQuiz) {
-            $count += $this->quizzes->where('status', 'active')->count();
-        }
 
         return $count;
     }

@@ -104,19 +104,7 @@ class ClassesController extends Controller
                     $query->where('subscribe', 1);
                 }
 
-                if (in_array('certificate_included', $moreOptions)) {
-                    $query->whereHas('quizzes', function ($query) {
-                        $query->where('certificate', 1)
-                            ->where('status', 'active');
-                    });
-                }
-
-                if (in_array('with_quiz', $moreOptions)) {
-                    $query->whereHas('quizzes', function ($query) {
-                        $query->where('status', 'active');
-                    });
-                }
-
+        
                 if (in_array('featured', $moreOptions)) {
                     $query->whereHas('feature', function ($query) {
                         $query->whereIn('page', ['home_categories', 'categories'])
