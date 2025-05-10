@@ -7,7 +7,6 @@ use App\Models\AdvertisingBanner;
 use App\Models\Cart;
 use App\Models\Favorite;
 use App\Models\File;
-use App\Models\QuizzesResult;
 use App\Models\RewardAccounting;
 use App\Models\Sale;
 use App\Models\TextLesson;
@@ -26,7 +25,7 @@ class WebinarController extends Controller
 
         if (auth()->check()) {
             $user = auth()->user();
-        } else if (getFeaturesSettings('webinar_private_content_status')) {
+        } elseif (getFeaturesSettings('webinar_private_content_status')) {
             $data = [
                 'pageTitle' => trans('update.private_content'),
                 'pageRobot' => getPageRobotNoIndex(),
@@ -34,87 +33,62 @@ class WebinarController extends Controller
 
             return view('web.default.course.private_content', $data);
         }
-     
 
         if (!empty($user) and !$user->access_content) {
             $data = [
                 'pageTitle' => trans('update.not_access_to_content'),
                 'pageRobot' => getPageRobotNoIndex(),
-                'userNotAccess' => true
+                'userNotAccess' => true,
             ];
 
             return view('web.default.course.private_content', $data);
         }
 
         $course = Webinar::where('slug', $slug)
-        ->when(
-            !$user->isTeacher(),
-            function ($query) {
+            ->when(!$user->isTeacher(), function ($query) {
                 $query->where('status', 'active');
-            }
-        )
-        ->with([
-            'chapters' => function ($query) use ($user) {
-                if (!$user->isTeacher()) {
-                    $query->where('status', WebinarChapter::$chapterActive);
-                }
-                $query->orderBy('order', 'asc');
-                $query->with([
-                    'chapterItems' => function ($query) {
-                        $query->orderBy('order', 'asc');
+            })
+            ->with([
+                'chapters' => function ($query) use ($user) {
+                    if (!$user->isTeacher()) {
+                        $query->where('status', WebinarChapter::$chapterActive);
                     }
-                ]);
-            },
-            'files' => function ($query) use ($user) {
-                if (!$user->isTeacher()) {
-                    $query->where('files.status', WebinarChapter::$chapterActive);
-                }
-                $query->join('webinar_chapters', 'webinar_chapters.id', '=', 'files.chapter_id')
-                    ->select('files.*', DB::raw('webinar_chapters.order as chapterOrder'))
-                    ->orderBy('chapterOrder', 'asc')
-                    ->orderBy('files.order', 'asc')
-                    ->with([
-                        'learningStatus' => function ($query) use ($user) {
-                            $query->where('user_id', $user->id ?? null);
-                        }
+                    $query->orderBy('order', 'asc');
+                    $query->with([
+                        'chapterItems' => function ($query) {
+                            $query->orderBy('order', 'asc');
+                        },
                     ]);
-            },
-            'filterOptions',
-            'teacher',
-        ])
-        ->first();
-    
-    if (empty($course)) {
-        return $justReturnData ? false : back()->with('error', 'Course not found.');
-    }
+                },
+                'files' => function ($query) use ($user) {
+                    if (!$user->isTeacher()) {
+                        $query->where('files.status', WebinarChapter::$chapterActive);
+                    }
+                    $query
+                        ->join('webinar_chapters', 'webinar_chapters.id', '=', 'files.chapter_id')
+                        ->select('files.*', DB::raw('webinar_chapters.order as chapterOrder'))
+                        ->orderBy('chapterOrder', 'asc')
+                        ->orderBy('files.order', 'asc')
+                        ->with([
+                            'learningStatus' => function ($query) use ($user) {
+                                $query->where('user_id', $user->id ?? null);
+                            },
+                        ]);
+                },
+                'filterOptions',
+                'teacher',
+            ])
+            ->first();
+
+        if (empty($course)) {
+            return $justReturnData ? false : back()->with('error', 'Course not found.');
+        }
 
         $webinarContentCount = 0;
         if (!empty($course->files)) {
             $webinarContentCount += $course->files->count();
         }
         $filesWithoutChapter = $course->files->whereNull('chapter_id');
-
-        $quizzes = $course->quizzes->whereNull('chapter_id');
-
-        if ($user) {
-            $quizzes = $this->checkQuizzesResults($user, $quizzes);
-
-            if (!empty($course->chapters) and count($course->chapters)) {
-                foreach ($course->chapters as $chapter) {
-                    if (!empty($chapter->chapterItems) and count($chapter->chapterItems)) {
-                        foreach ($chapter->chapterItems as $chapterItem) {
-                            if (!empty($chapterItem->quiz)) {
-                                $chapterItem->quiz = $this->checkQuizResults($user, $chapterItem->quiz);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!empty($course->quizzes) and count($course->quizzes)) {
-                $course->quizzes = $this->checkQuizzesResults($user, $course->quizzes);
-            }
-        }
 
         $pageRobot = getPageRobot('course_show');
 
@@ -135,56 +109,6 @@ class WebinarController extends Controller
         return view('web.default.course.index', $data);
     }
 
-    private function checkQuizzesResults($user, $quizzes)
-    {
-        $canDownloadCertificate = false;
-
-        foreach ($quizzes as $quiz) {
-            $quiz = $this->checkQuizResults($user, $quiz);
-        }
-
-        return $quizzes;
-    }
-
-    private function checkQuizResults($user, $quiz)
-    {
-        $canDownloadCertificate = false;
-
-        $canTryAgainQuiz = false;
-        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)
-            ->where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        if (count($userQuizDone)) {
-            $quiz->user_grade = $userQuizDone->first()->user_grade;
-            $quiz->result_count = $userQuizDone->count();
-            $quiz->result = $userQuizDone->first();
-
-            $status_pass = false;
-            foreach ($userQuizDone as $result) {
-                if ($result->status == QuizzesResult::$passed) {
-                    $status_pass = true;
-                }
-            }
-
-            $quiz->result_status = $status_pass ? QuizzesResult::$passed : $userQuizDone->first()->status;
-
-            if ($quiz->certificate and $quiz->result_status == QuizzesResult::$passed) {
-                $canDownloadCertificate = true;
-            }
-        }
-
-        if (!isset($quiz->attempt) or (count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed)) {
-            $canTryAgainQuiz = true;
-        }
-
-        $quiz->can_try = $canTryAgainQuiz;
-        $quiz->can_download_certificate = $canDownloadCertificate;
-
-        return $quiz;
-    }
-
     private function checkCanAccessToPrivateCourse($course, $user = null): bool
     {
         if (empty($user)) {
@@ -202,14 +126,10 @@ class WebinarController extends Controller
 
     public function downloadFile($slug, $file_id)
     {
-        $webinar = Webinar::where('slug', $slug)
-            ->where('status', 'active')
-            ->first();
+        $webinar = Webinar::where('slug', $slug)->where('status', 'active')->first();
 
         if (!empty($webinar) and $this->checkCanAccessToPrivateCourse($webinar)) {
-            $file = File::where('webinar_id', $webinar->id)
-                ->where('id', $file_id)
-                ->first();
+            $file = File::where('webinar_id', $webinar->id)->where('id', $file_id)->first();
 
             if (!empty($file) and $file->downloadable) {
                 $canAccess = true;
@@ -230,9 +150,7 @@ class WebinarController extends Controller
                         $fileName = str_replace('.', '-', $fileName);
                         $fileName .= '.' . $file->file_type;
 
-                        $headers = array(
-                            'Content-Type: application/' . $file->file_type,
-                        );
+                        $headers = ['Content-Type: application/' . $file->file_type];
 
                         return response()->download($filePath, $fileName, $headers);
                     }
@@ -240,7 +158,7 @@ class WebinarController extends Controller
                     $toastData = [
                         'title' => trans('public.not_access_toast_lang'),
                         'msg' => trans('public.not_access_toast_msg_lang'),
-                        'status' => 'error'
+                        'status' => 'error',
                     ];
                     return back()->with(['toast' => $toastData]);
                 }
@@ -252,14 +170,10 @@ class WebinarController extends Controller
 
     public function showHtmlFile($slug, $file_id)
     {
-        $webinar = Webinar::where('slug', $slug)
-            ->where('status', 'active')
-            ->first();
+        $webinar = Webinar::where('slug', $slug)->where('status', 'active')->first();
 
         if (!empty($webinar) and $this->checkCanAccessToPrivateCourse($webinar)) {
-            $file = File::where('webinar_id', $webinar->id)
-                ->where('id', $file_id)
-                ->first();
+            $file = File::where('webinar_id', $webinar->id)->where('id', $file_id)->first();
 
             if (!empty($file)) {
                 $canAccess = true;
@@ -274,7 +188,7 @@ class WebinarController extends Controller
                     if (\Illuminate\Support\Facades\File::exists(public_path($filePath))) {
                         $data = [
                             'pageTitle' => $file->title,
-                            'path' => url($filePath)
+                            'path' => url($filePath),
                         ];
                         return view('web.default.course.learningPage.interactive_file', $data);
                     }
@@ -284,7 +198,7 @@ class WebinarController extends Controller
                     $toastData = [
                         'title' => trans('public.not_access_toast_lang'),
                         'msg' => trans('public.not_access_toast_msg_lang'),
-                        'status' => 'error'
+                        'status' => 'error',
                     ];
                     return back()->with(['toast' => $toastData]);
                 }
@@ -298,13 +212,12 @@ class WebinarController extends Controller
     {
         $user = auth()->user();
         $this->validate($request, [
-            'file_id' => 'required'
+            'file_id' => 'required',
         ]);
 
         $file_id = $request->get('file_id');
 
-        $file = File::where('id', $file_id)
-            ->first();
+        $file = File::where('id', $file_id)->first();
 
         if (!empty($file)) {
             $webinar = Webinar::where('id', $file->webinar_id)
@@ -315,12 +228,13 @@ class WebinarController extends Controller
                 })
                 ->with([
                     'files' => function ($query) use ($user) {
-                        $query->select('id', 'webinar_id', 'file_type')
+                        $query
+                            ->select('id', 'webinar_id', 'file_type')
                             ->when(!$user->isTeacher(), function ($query) {
                                 $query->where('status', 'active');
                             })
                             ->orderBy('order', 'asc');
-                    }
+                    },
                 ])
                 ->first();
 
@@ -340,12 +254,15 @@ class WebinarController extends Controller
                         $path = url("/course/$webinar->slug/file/$file->id/showHtml");
                     }
 
-                    return response()->json([
-                        'code' => 200,
-                        'storage' => $file->storage,
-                        'path' => $path,
-                        'storageService' => $file->storage
-                    ], 200);
+                    return response()->json(
+                        [
+                            'code' => 200,
+                            'storage' => $file->storage,
+                            'path' => $path,
+                            'storageService' => $file->storage,
+                        ],
+                        200,
+                    );
                 }
             }
         }
@@ -358,14 +275,10 @@ class WebinarController extends Controller
         // this methode linked from video modal for play local video
         // and linked from file.blade for show google_drive,dropbox,iframe
 
-        $webinar = Webinar::where('slug', $slug)
-            ->where('status', 'active')
-            ->first();
+        $webinar = Webinar::where('slug', $slug)->where('status', 'active')->first();
 
         if (!empty($webinar) and $this->checkCanAccessToPrivateCourse($webinar)) {
-            $file = File::where('webinar_id', $webinar->id)
-                ->where('id', $file_id)
-                ->first();
+            $file = File::where('webinar_id', $webinar->id)->where('id', $file_id)->first();
 
             if (!empty($file)) {
                 $canAccess = true;
@@ -380,11 +293,11 @@ class WebinarController extends Controller
                     if (in_array($file->storage, $notVideoSource)) {
                         $data = [
                             'pageTitle' => $file->title,
-                            'iframe' => $file->file
+                            'iframe' => $file->file,
                         ];
 
                         return view('web.default.course.learningPage.interactive_file', $data);
-                    } else if ($file->isVideo()) {
+                    } elseif ($file->isVideo()) {
                         return response()->file(public_path($file->file));
                     }
                 }
@@ -394,94 +307,94 @@ class WebinarController extends Controller
         abort(403);
     }
 
-        public function getLesson(Request $request, $slug, $lesson_id)
-        {
-            $user = null;
+    public function getLesson(Request $request, $slug, $lesson_id)
+    {
+        $user = null;
 
-            if (auth()->check()) {
-                $user = auth()->user();
-            }
+        if (auth()->check()) {
+            $user = auth()->user();
+        }
 
-            $course = Webinar::where('slug', $slug)
-                ->where('status', 'active')
-                ->with(['teacher', 'textLessons' => function ($query) {
+        $course = Webinar::where('slug', $slug)
+            ->where('status', 'active')
+            ->with([
+                'teacher',
+                'textLessons' => function ($query) {
                     $query->orderBy('order', 'asc');
-                }])
+                },
+            ])
+            ->first();
+
+        if (!empty($course) and $this->checkCanAccessToPrivateCourse($course)) {
+            $textLesson = TextLesson::where('id', $lesson_id)
+                ->where('webinar_id', $course->id)
+                ->where('status', WebinarChapter::$chapterActive)
+                ->with([
+                    'attachments' => function ($query) {
+                        $query->with('file');
+                    },
+                    'learningStatus' => function ($query) use ($user) {
+                        $query->where('user_id', !empty($user) ? $user->id : null);
+                    },
+                ])
                 ->first();
 
-            if (!empty($course) and $this->checkCanAccessToPrivateCourse($course)) {
-                $textLesson = TextLesson::where('id', $lesson_id)
-                    ->where('webinar_id', $course->id)
-                    ->where('status', WebinarChapter::$chapterActive)
-                    ->with([
-                        'attachments' => function ($query) {
-                            $query->with('file');
-                        },
-                        'learningStatus' => function ($query) use ($user) {
-                            $query->where('user_id', !empty($user) ? $user->id : null);
-                        }
-                    ])
-                    ->first();
+            if (!empty($textLesson)) {
+                $canAccess = $course->checkUserHasBought();
 
-                if (!empty($textLesson)) {
-                    $canAccess = $course->checkUserHasBought();
-
-                    if ($textLesson->accessibility == 'paid' and !$canAccess) {
-                        $toastData = [
-                            'title' => trans('public.request_failed'),
-                            'msg' => trans('cart.you_not_purchased_this_course'),
-                            'status' => 'error'
-                        ];
-                        return back()->with(['toast' => $toastData]);
-                    }
-
-                    $checkSequenceContent = $textLesson->checkSequenceContent();
-                    $sequenceContentHasError = (!empty($checkSequenceContent) and (!empty($checkSequenceContent['all_passed_items_error']) or !empty($checkSequenceContent['access_after_day_error'])));
-
-                    if (!empty($checkSequenceContent) and $sequenceContentHasError) {
-                        $toastData = [
-                            'title' => trans('public.request_failed'),
-                            'msg' => ($checkSequenceContent['all_passed_items_error'] ? $checkSequenceContent['all_passed_items_error'] . ' - ' : '') . ($checkSequenceContent['access_after_day_error'] ?? ''),
-                            'status' => 'error'
-                        ];
-                        return back()->with(['toast' => $toastData]);
-                    }
-
-                    $nextLesson = null;
-                    $previousLesson = null;
-                    if (!empty($course->textLessons) and count($course->textLessons)) {
-                        $nextLesson = $course->textLessons->where('order', '>', $textLesson->order)->first();
-                        $previousLesson = $course->textLessons->where('order', '<', $textLesson->order)->first();
-                    }
-
-                    if (!empty($nextLesson)) {
-                        $nextLesson->not_purchased = ($nextLesson->accessibility == 'paid' and !$canAccess);
-                    }
-
-
-                    $data = [
-                        'pageTitle' => $textLesson->title,
-                        'textLesson' => $textLesson,
-                        'course' => $course,
-                        'nextLesson' => $nextLesson,
-                        'previousLesson' => $previousLesson,
+                if ($textLesson->accessibility == 'paid' and !$canAccess) {
+                    $toastData = [
+                        'title' => trans('public.request_failed'),
+                        'msg' => trans('cart.you_not_purchased_this_course'),
+                        'status' => 'error',
                     ];
-
-                    return view(getTemplate() . '.course.text_lesson', $data);
+                    return back()->with(['toast' => $toastData]);
                 }
-            }
 
-            abort(404);
+                $checkSequenceContent = $textLesson->checkSequenceContent();
+                $sequenceContentHasError = (!empty($checkSequenceContent) and (!empty($checkSequenceContent['all_passed_items_error']) or !empty($checkSequenceContent['access_after_day_error'])));
+
+                if (!empty($checkSequenceContent) and $sequenceContentHasError) {
+                    $toastData = [
+                        'title' => trans('public.request_failed'),
+                        'msg' => ($checkSequenceContent['all_passed_items_error'] ? $checkSequenceContent['all_passed_items_error'] . ' - ' : '') . ($checkSequenceContent['access_after_day_error'] ?? ''),
+                        'status' => 'error',
+                    ];
+                    return back()->with(['toast' => $toastData]);
+                }
+
+                $nextLesson = null;
+                $previousLesson = null;
+                if (!empty($course->textLessons) and count($course->textLessons)) {
+                    $nextLesson = $course->textLessons->where('order', '>', $textLesson->order)->first();
+                    $previousLesson = $course->textLessons->where('order', '<', $textLesson->order)->first();
+                }
+
+                if (!empty($nextLesson)) {
+                    $nextLesson->not_purchased = ($nextLesson->accessibility == 'paid' and !$canAccess);
+                }
+
+                $data = [
+                    'pageTitle' => $textLesson->title,
+                    'textLesson' => $textLesson,
+                    'course' => $course,
+                    'nextLesson' => $nextLesson,
+                    'previousLesson' => $previousLesson,
+                ];
+
+                return view(getTemplate() . '.course.text_lesson', $data);
+            }
         }
+
+        abort(404);
+    }
 
     public function free(Request $request, $slug)
     {
         if (auth()->check()) {
             $user = auth()->user();
 
-            $course = Webinar::where('slug', $slug)
-                ->where('status', 'active')
-                ->first();
+            $course = Webinar::where('slug', $slug)->where('status', 'active')->first();
 
             if (!empty($course)) {
                 $checkCourseForSale = checkCourseForSale($course, $user);
@@ -494,7 +407,7 @@ class WebinarController extends Controller
                     $toastData = [
                         'title' => trans('cart.fail_purchase'),
                         'msg' => trans('cart.course_not_free'),
-                        'status' => 'error'
+                        'status' => 'error',
                     ];
                     return back()->with(['toast' => $toastData]);
                 }
@@ -513,7 +426,7 @@ class WebinarController extends Controller
                 $toastData = [
                     'title' => '',
                     'msg' => trans('cart.success_pay_msg_for_free_course'),
-                    'status' => 'success'
+                    'status' => 'success',
                 ];
                 return back()->with(['toast' => $toastData]);
             }
@@ -536,10 +449,7 @@ class WebinarController extends Controller
 
             $data = $request->all();
 
-            $webinar = Webinar::select('id', 'status')
-                ->where('id', $id)
-                ->where('status', 'active')
-                ->first();
+            $webinar = Webinar::select('id', 'status')->where('id', $id)->where('status', 'active')->first();
 
             if (!empty($webinar)) {
                 WebinarReport::create([
@@ -547,18 +457,24 @@ class WebinarController extends Controller
                     'webinar_id' => $webinar->id,
                     'reason' => $data['reason'],
                     'message' => $data['message'],
-                    'created_at' => time()
+                    'created_at' => time(),
                 ]);
 
-                return response()->json([
-                    'code' => 200
-                ], 200);
+                return response()->json(
+                    [
+                        'code' => 200,
+                    ],
+                    200,
+                );
             }
         }
 
-        return response()->json([
-            'code' => 401
-        ], 200);
+        return response()->json(
+            [
+                'code' => 401,
+            ],
+            200,
+        );
     }
 
     public function learningStatus(Request $request, $id)
@@ -575,15 +491,13 @@ class WebinarController extends Controller
                 $item_id = $data['item_id'];
                 $status = $data['status'];
 
-                CourseLearning::where('user_id', $user->id)
-                    ->where($item, $item_id)
-                    ->delete();
+                CourseLearning::where('user_id', $user->id)->where($item, $item_id)->delete();
 
-                if ($status and $status == "true") {
+                if ($status and $status == 'true') {
                     CourseLearning::create([
                         'user_id' => $user->id,
                         $item => $item_id,
-                        'created_at' => time()
+                        'created_at' => time(),
                     ]);
                 }
 
@@ -599,16 +513,14 @@ class WebinarController extends Controller
         if (auth()->check()) {
             $user = auth()->user();
 
-            $course = Webinar::where('slug', $slug)
-                ->where('status', 'active')
-                ->first();
+            $course = Webinar::where('slug', $slug)->where('status', 'active')->first();
 
             if (!empty($course)) {
                 if (empty($course->points)) {
                     $toastData = [
                         'title' => '',
                         'msg' => trans('update.can_not_buy_this_course_with_point'),
-                        'status' => 'error'
+                        'status' => 'error',
                     ];
                     return back()->with(['toast' => $toastData]);
                 }
@@ -619,7 +531,7 @@ class WebinarController extends Controller
                     $toastData = [
                         'title' => '',
                         'msg' => trans('update.you_have_no_enough_points_for_this_course'),
-                        'status' => 'error'
+                        'status' => 'error',
                     ];
                     return back()->with(['toast' => $toastData]);
                 }
@@ -646,7 +558,7 @@ class WebinarController extends Controller
                 $toastData = [
                     'title' => '',
                     'msg' => trans('update.success_pay_course_with_point_msg'),
-                    'status' => 'success'
+                    'status' => 'success',
                 ];
                 return back()->with(['toast' => $toastData]);
             }
@@ -672,10 +584,7 @@ class WebinarController extends Controller
             $webinarId = $data['item_id'];
             $ticketId = $data['ticket_id'] ?? null;
 
-            $webinar = Webinar::where('id', $webinarId)
-                ->where('private', false)
-                ->where('status', 'active')
-                ->first();
+            $webinar = Webinar::where('id', $webinarId)->where('private', false)->where('status', 'active')->first();
 
             if (!empty($webinar)) {
                 $checkCourseForSale = checkCourseForSale($webinar, $user);

@@ -247,7 +247,7 @@ class ChapterController extends Controller
 
                 case WebinarChapterItem::$chapterQuiz:
                     $item = Quiz::where('id', $data['item_id'])
-                        ->where('webinar_id', $data['webinar_id'])
+                       
                         ->first();
                     break;
 

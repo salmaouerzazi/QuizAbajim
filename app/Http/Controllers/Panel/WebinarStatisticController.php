@@ -45,9 +45,7 @@ class WebinarStatisticController extends Controller
                 'assignments' => function ($query) {
                     $query->where('status', 'active');
                 },
-                'quizzes' => function ($query) {
-                    $query->where('status', 'active');
-                },
+
                 'files' => function ($query) {
                     $query->where('status', 'active');
                 },

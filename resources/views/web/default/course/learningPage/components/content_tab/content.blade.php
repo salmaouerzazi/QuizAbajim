@@ -67,6 +67,19 @@
                         for="readToggle{{ $type }}{{ $item->id }}"></label>
                 </div>
             </div>
+
+
+
         </div>
     </div>
+
 </div>
+@foreach ($item->chapter->quiz as $quiz)
+    <a href="{{ route('panel.quiz.do', $quiz->id) }}" class="d-flex align-items-start p-10 cursor-pointer text-decoration-none">
+        <span class="chapter-icon bg-gray300 mr-10">
+            <i data-feather="file-text" class="text-gray" width="16" height="16"></i>
+        </span>
+        <span class="font-12 text-dark-blue d-block">{{ $quiz->title }}</span>
+    </a>
+@endforeach
+

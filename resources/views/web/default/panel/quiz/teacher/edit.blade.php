@@ -199,7 +199,7 @@
                                                         name="questions[{{ $index }}][answers][{{ $i }}][matching]"
                                                         value="{{ $answer['matching'] ?? '' }}">
 
-                                                    <button type="button"
+                                                    <button type="button ;" onclick="confirmDeleteAnswer(this)"
                                                         class="btn btn-sm btn-outline-primary delete-matching-row"
                                                         style="height: 40px; width: 40px;">
                                                         <i class="fas fa-trash"></i>
@@ -207,11 +207,10 @@
                                                 </div>
                                             @endforeach
 
-                                        
+
                                         </div>
                                         <div class="text-end mt-2">
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-secondary add-matching-row"
+                                            <button type="button" class="btn btn-sm btn-outline-secondary add-matching-row"
                                                 data-index="{{ $index }}">
                                                 ➕ إضافة عنصر
                                             </button>
@@ -287,7 +286,7 @@
 
                                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                                     style="height: 40px; width: 40px;"
-                                                    onclick="this.closest('.answer-item').remove()">
+                                                    onclick="confirmDeleteAnswer(this)">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
@@ -311,54 +310,132 @@
             </div>
         </div>
     </div>
+    <script>
+        function confirmDeleteAnswer(button) {
+            event.preventDefault();     
+            event.stopPropagation(); 
+
+            const answerItem = button.closest('.answer-item');
+
+            if (!answerItem) return;
+
+            // Détecter dynamiquement le conteneur contenant les réponses
+            const container = answerItem.parentElement;
+            const allAnswers = container.querySelectorAll('.answer-item');
+
+            // Vérification minimum de 2 réponses
+            if (allAnswers.length <= 2) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'غير ممكن',
+                    text: 'يجب أن يحتوي كل سؤال على إجابتين على الأقل.',
+                    confirmButtonText: 'موافق'
+                });
+                return;
+            }
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: "هل تريد حذف هذه الإجابة؟",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'نعم، احذفها',
+                cancelButtonText: 'إلغاء'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const answerItem = button.closest('.answer-item');
+                    if (answerItem) {
+                        answerItem.classList.add('fade-out');
+                        setTimeout(() => answerItem.remove(), 300);
+                    }
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'تم الحذف',
+                        showConfirmButton: false,
+                        timer: 1000
+                    });
+                }
+            });
+        }
+    </script>
 
     <script>
         function addAnswer(index) {
-            const input = document.getElementById(`add-answer-input-${index}`);
-            const value = input.value.trim();
-            if (value === '') return;
+    const input = document.getElementById(`add-answer-input-${index}`);
+    const value = input.value.trim();
+    if (value === '') return;
 
-            const container = document.getElementById(`answers-container-${index}`);
-            const inputs = container.querySelectorAll('input[name^="questions"][name$="[answer_text]"]');
-            const newIndex = inputs.length;
+    const container = document.getElementById(`answers-container-${index}`);
+    const inputs = container.querySelectorAll('input[name^="questions"][name$="[answer_text]"]');
+    const newIndex = inputs.length;
 
-            const inputGroup = document.createElement('div');
-            inputGroup.className = 'input-group mb-2';
+    const inputGroup = document.createElement('div');
+    inputGroup.className = 'input-group mb-2 align-items-center answer-item'; // ✅ ajoute .answer-item ici
 
-            const radioDiv = document.createElement('div');
-            radioDiv.className = 'input-group-text';
+    const radioDiv = document.createElement('div');
+    radioDiv.className = 'input-group-text';
 
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = `questions[${index}][correct]`;
-            radio.value = newIndex;
-            radioDiv.appendChild(radio);
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = `questions[${index}][correct]`;
+    radio.value = newIndex;
+    radioDiv.appendChild(radio);
 
-            const textInput = document.createElement('input');
-            textInput.type = 'text';
-            textInput.className = 'form-control';
-            textInput.name = `questions[${index}][answers][${newIndex}][answer_text]`;
-            textInput.value = value;
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'form-control';
+    textInput.name = `questions[${index}][answers][${newIndex}][answer_text]`;
+    textInput.value = value;
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'btn btn-sm btn-outline-primary';
-            deleteBtn.style.height = '40px';
-            deleteBtn.style.width = '20px';
-            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            deleteBtn.onclick = function(e) {
-                e.preventDefault();
-                wrapper.remove();
-            };
-
-            inputGroup.appendChild(radioDiv);
-            inputGroup.appendChild(textInput);
-            inputGroup.appendChild(deleteBtn);
-
-            container.appendChild(inputGroup);
-            input.value = '';
-            textInput.focus();
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn btn-sm btn-outline-primary';
+    deleteBtn.style.height = '40px';
+    deleteBtn.style.width = '20px';
+    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    deleteBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const answerItems = container.querySelectorAll('.answer-item');
+        if (answerItems.length <= 2) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'غير ممكن',
+                text: 'يجب أن تحتوي كل سؤال على إجابتين على الأقل.',
+                confirmButtonText: 'موافق'
+            });
+            return;
         }
+
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: "هل تريد حذف هذه الإجابة؟",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'نعم، احذفها',
+            cancelButtonText: 'إلغاء'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                inputGroup.classList.add('fade-out');
+                setTimeout(() => inputGroup.remove(), 300);
+            }
+        });
+    };
+
+    inputGroup.appendChild(radioDiv);
+    inputGroup.appendChild(textInput);
+    inputGroup.appendChild(deleteBtn);
+
+    container.appendChild(inputGroup);
+    input.value = '';
+    textInput.focus();
+}
+
+    
         document.querySelectorAll('[id^="add-answer-input-"]').forEach(function(input) {
             input.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -441,9 +518,37 @@
                     deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
 
                     // Supprimer la ligne
-                    deleteBtn.onclick = function() {
-                        wrapper.remove();
+                    deleteBtn.onclick = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const answerItems = container.querySelectorAll('.answer-item');
+                        if (answerItems.length <= 2) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'غير ممكن',
+                                text: 'يجب أن تحتوي كل سؤال على إجابتين على الأقل.',
+                                confirmButtonText: 'موافق'
+                            });
+                            return;
+                        }
+
+                        Swal.fire({
+                            title: 'هل أنت متأكد؟',
+                            text: "هل تريد حذف هذه الإجابة؟",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'نعم، احذفها',
+                            cancelButtonText: 'إلغاء'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                wrapper.classList.add('fade-out');
+                                setTimeout(() => wrapper.remove(), 300);
+                            }
+                        });
                     };
+
 
                     // Ajouter tout dans la ligne
                     wrapper.appendChild(inputLeft);
@@ -592,9 +697,22 @@
     </script>
     <script>
         function deleteQuestion(button) {
-            const questionId = button.dataset.id;
             const card = button.closest('.card');
             const cardId = card.id;
+            const questionId = button.dataset.id;
+
+            // 🧠 Compter le nombre total de questions visibles dans le DOM
+            const allCards = document.querySelectorAll('.card.shadow-sm.mb-4');
+            if (allCards.length <= 1) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'غير ممكن',
+                    text: 'يجب أن يحتوي الاختبار على سؤال واحد على الأقل.',
+                    confirmButtonText: 'موافق'
+                });
+                return;
+            }
+
             const listItem = document.querySelector(`.question-item[data-id="${cardId}"]`);
 
             Swal.fire({
@@ -623,7 +741,6 @@
                                 if (listItem) listItem.remove();
                                 updateQuestionNumbers();
                             }, 300);
-
 
                             Swal.fire({
                                 icon: 'success',

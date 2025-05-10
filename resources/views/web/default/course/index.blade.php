@@ -42,26 +42,13 @@
                         </div>
 
                         @if($hasBought or $course->isWebinar())
-                            @php
-                                $percent = $course->getProgress();
-                            @endphp
+                         
 
                             <div class="mt-30 d-flex align-items-center">
                                 <div class="progress course-progress flex-grow-1 shadow-xs rounded-sm">
-                                    <span class="progress-bar rounded-sm bg-warning" style="width: {{ $percent }}%"></span>
                                 </div>
 
-                                <span class="ml-15 font-14 font-weight-500">
-                                    @if($course->isWebinar())
-                                        @if($hasBought and $course->isProgressing())
-                                            {{ trans('public.course_learning_passed',['percent' => $percent]) }}
-                                        @else
-                                            {{ $course->sales_count }}/{{ $course->capacity }} {{ trans('quiz.students') }}
-                                        @endif
-                                    @else
-                                        {{ trans('public.course_learning_passed',['percent' => $percent]) }}
-                                    @endif
-                            </span>
+                              
                             </div>
                         @endif
                     </div>

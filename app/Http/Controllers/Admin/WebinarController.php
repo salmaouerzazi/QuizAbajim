@@ -456,7 +456,6 @@ class WebinarController extends Controller
                 },
                 'filterOptions',
                 'prerequisites',
-                'quizzes',
                 'webinarPartnerTeacher' => function ($query) {
                     $query->with(['teacher' => function ($query) {
                         $query->select('id', 'full_name');
@@ -487,9 +486,7 @@ class WebinarController extends Controller
             ->with('subCategories')
             ->get();
 
-        $teacherQuizzes = Quiz::where('webinar_id', null)
-            ->where('creator_id', $webinar->teacher_id)
-            ->get();
+
 
         $tags = $webinar->tags->pluck('title')->toArray();
         $materials = Material::all();
@@ -507,9 +504,7 @@ class WebinarController extends Controller
             'textLessons' => $webinar->textLessons,
             'faqs' => $webinar->faqs,
             'assignments' => $webinar->assignments,
-            'teacherQuizzes' => $teacherQuizzes,
             'prerequisites' => $webinar->prerequisites,
-            'webinarQuizzes' => $webinar->quizzes,
             'webinarPartnerTeacher' => $webinar->webinarPartnerTeacher,
             'webinarTags' => $tags,
             'defaultLocale' => getDefaultLocale(),
@@ -781,9 +776,6 @@ class WebinarController extends Controller
                     $query->where('status', 'active');
                 },
                 'assignments' => function ($query) {
-                    $query->where('status', 'active');
-                },
-                'quizzes' => function ($query) {
                     $query->where('status', 'active');
                 },
                 'files' => function ($query) {

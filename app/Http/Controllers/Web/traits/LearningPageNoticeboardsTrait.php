@@ -9,6 +9,7 @@ trait LearningPageNoticeboardsTrait
 {
     public function noticeboards($slug)
     {
+      
         $user = auth()->user();
 
         $course = $this->getCourse($slug, $user, 'noticeboards');
