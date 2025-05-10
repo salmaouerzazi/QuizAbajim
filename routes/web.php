@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Controllers\Panel\CardReservationController;
+use App\Http\Controllers\Panel\QuizController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,6 +17,8 @@ use App\Http\Controllers\Panel\CardReservationController;
 | contains the "web" middleware group. Now create something great!
 |
 */
+Route::get('/course/quizzes/do/{id}', [QuizController::class, 'showForChild'])->name('panel.quiz.do');
+
 Route::post('/clear-session', function () {
     Session::forget('teacher_id');
     return response()->json(['success' => 'Session variable cleared']);

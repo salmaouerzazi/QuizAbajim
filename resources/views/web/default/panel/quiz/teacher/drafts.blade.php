@@ -92,7 +92,7 @@
                 loadQuizzes(); // recharge les quiz avec le texte de recherche
             });
 
-            // 🔁 Fonction pour intercepter les clics pagination
+            //  Fonction pour intercepter les clics pagination
             function attachPaginationLinks() {
                 const links = quizWrapper.querySelectorAll('.pagination a');
                 links.forEach(link => {
@@ -340,4 +340,22 @@
             materialFilter.addEventListener('change', applyFilters);
             statuesFilter.addEventListener('change', applyFilters);
         </script>
+        @if(session('success'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            Swal.fire({
+                icon: 'success',
+                title: 'نجاح',
+                text: '{{ session('success') }}',
+                toast: true,
+                position: 'bottom-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        });
+    </script>
+@endif
+
+
     @endsection

@@ -39,15 +39,16 @@
                                 </a>
                             </li>
                             <li>
-                                <form action="{{ route('panel.quiz.destroy', $quiz->id) }}" method="POST">
+                                <form id="deleteQuizForm{{ $quiz->id }}" action="{{ route('panel.quiz.destroy', $quiz->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" onclick="deleteQuiz(event, {{ $quiz->id }})"
+                                    <button type="button" onclick="confirmDelete({{ $quiz->id }})"
                                         class="dropdown-item d-flex justify-content-between align-items-center text-danger">
                                         حذف <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </li>
+                            
                         </ul>
                     </div>
                 </div>
@@ -77,17 +78,26 @@
     </div>
 </div>
 @push('scripts_bottom')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    function deleteQuiz(event, quizId) {
-        event.preventDefault();
-        if (confirm('هل أنت متأكد أنك تريد حذف هذا الاختبار؟')) {
-            
-            const form = event.target.closest('form');
-            form.submit();
-        }
+    function confirmDelete(quizId) {
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: 'هل تريد حقاً حذف هذا التحدي؟',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'نعم، احذفه!',
+            cancelButtonText: 'إلغاء',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('deleteQuizForm' + quizId).submit();
+            }
+        });
     }
-
 </script>
 
 @endpush
