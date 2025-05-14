@@ -161,6 +161,7 @@
     </div>
 @endsection
 
+
 @push('scripts_bottom')
     <script src="https://cdn.jsdelivr.net/npm/leader-line-new/leader-line.min.js"></script>
     <script>
@@ -176,7 +177,6 @@
             });
             hideAllLines();
             const qId = getCurrentQuestionId();
-            console.log(qId, 'azeaze');
             showLines(qId);
         }
 
@@ -211,23 +211,53 @@
 
         function clearLinesFromSource(qId, sourceEl) {
             if (!lines[qId]) return;
-            lines[qId] = lines[qId].filter(line => {
-                const fromSameSource = line.start?.element === sourceEl;
-                if (fromSameSource) line.remove();
-                return !fromSameSource;
+
+            const sourceText = sourceEl.dataset.text;
+            const targetText = mappings[qId]?.[sourceText];
+
+            const updatedLines = [];
+
+            lines[qId].forEach(line => {
+                const sameSource = line.start === sourceEl;
+
+                if (sameSource) {
+                    try {
+                        line.remove();
+                    } catch (err) {
+                        console.error("Erreur lors du remove de la ligne :", err);
+                    }
+                } else {
+                    updatedLines.push(line);
+                }
             });
+
+            lines[qId] = updatedLines;
+
+            if (mappings[qId]) {
+                delete mappings[qId][sourceText];
+            }
+
+            sourceEl.classList.remove('connected', 'selected');
+
+            if (targetText) {
+                const targetEl = Array.from(document.querySelectorAll(`.arrow-target[data-question="${qId}"]`))
+                    .find(t => t.dataset.text === targetText);
+                if (targetEl) targetEl.classList.remove('connected');
+            }
+            const input = document.getElementById(`match-result-${qId}`);
+            if (input) {
+                input.value = JSON.stringify(mappings[qId] || {});
+            }
         }
+
 
         function addLine(qId, sourceEl, targetEl) {
             const line = new LeaderLine({
-
                 start: sourceEl,
                 end: targetEl,
                 color: '#007BFF',
                 size: 3,
                 path: 'straight',
-
-
             });
 
             if (!lines[qId]) lines[qId] = [];
@@ -235,93 +265,70 @@
             line.show();
         }
 
+        function removeLine(qId, sourceEl, targetEl) {
+            const line = lines[qId]?.find(l => l.start === sourceEl && l.end === targetEl);
+            if (line) {
+                line.remove();
+                lines[qId] = lines[qId].filter(l => l !== line);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             showQuestion(currentIndex);
-
             document.querySelectorAll('.arrow-source').forEach(source => {
                 source.addEventListener('click', () => {
                     const qId = source.dataset.question;
+                    //-----> Si déjà connecté, supprimer la flèche
                     if (source.classList.contains('connected')) {
                         clearLinesFromSource(qId, source);
-                        const sourceText = source.dataset.text;
-                        const sourceQuestionBox = document.getElementById(
-                            `source-${qId}-${source.id.split('-')[2]}`);
-                        delete mappings[qId]?.[sourceText];
-                        document.getElementById(`match-result-${qId}`).value = JSON.stringify(
-                            mappings[qId] || {});
-                        source.classList.remove('connected', 'selected');
                         selectedSource = null;
                         return;
                     }
-
-                    document.querySelectorAll(`.arrow-source[data-question="${qId}"]`).forEach(el =>
-                        el.classList.remove('selected'));
+                    //-----> Sélection d'une nouvelle source
+                    document.querySelectorAll(`.arrow-source[data-question="${qId}"]`)
+                        .forEach(el => el.classList.remove('selected'));
                     source.classList.add('selected');
                     selectedSource = source;
                 });
             });
+
             document.querySelectorAll('.arrow-target').forEach(target => {
                 target.addEventListener('click', () => {
                     if (!selectedSource) return;
-                    
 
                     const qId = selectedSource.dataset.question;
-                    console.log(qId, 'questionId');
                     const sourceText = selectedSource.dataset.text;
                     const targetText = target.dataset.text;
-                    const sourceQuestionBox = document.getElementById(
-                        `source-${qId}-${selectedSource.id.split('-')[2]}`);
-                    const targetQuestionBox = document.getElementById(
-                        `target-${qId}-${target.id.split('-')[2]}`);
 
-                    // Remove existing line from this source
+                    //-----> Vérifie si la target est déjà utilisée
+                    const usedTargets = Object.values(mappings[qId] || {});
+                    if (usedTargets.includes(targetText)) {
+                        alert("❌ لا يمكن ربط نفس الجواب بأكثر من سؤال.");
+                        return;
+                    }
+                    //-----> Supprimer flèche précédente de la source
                     clearLinesFromSource(qId, selectedSource);
 
-                    // ✅ Draw arrow after browser renders layout
-                    requestAnimationFrame(() => {
-                        addLine(qId, sourceQuestionBox, targetQuestionBox);
-                                        });
+                    //-----> Dessiner la nouvelle flèche
+                    const sourceBox = document.getElementById(
+                        `source-${qId}-${selectedSource.id.split('-')[2]}`);
+                    const targetBox = document.getElementById(
+                        `target-${qId}-${target.id.split('-')[2]}`);
+                    requestAnimationFrame(() => addLine(qId, sourceBox, targetBox));
 
-                    // Update internal mappings and UI state
+                    //-----> Mettre à jour le mapping
                     if (!mappings[qId]) mappings[qId] = {};
                     mappings[qId][sourceText] = targetText;
 
-                    document.getElementById(`match-result-${qId}`).value = JSON.stringify(mappings[
-                        qId]);
-
                     selectedSource.classList.remove('selected');
                     selectedSource.classList.add('connected');
+                    target.classList.add('connected');
                     selectedSource = null;
+                    document.getElementById(`match-result-${qId}`).value = JSON.stringify(mappings[
+                        qId]);
                 });
             });
-
-            // document.querySelectorAll('.arrow-target').forEach(target => {
-            //     target.addEventListener('click', () => {
-            //         if (!selectedSource) return;
-
-            //         const qId = selectedSource.dataset.question;
-            //         const sourceText = selectedSource.dataset.text;
-            //         const targetText = target.dataset.text;
-
-            //         clearLinesFromSource(qId, selectedSource);
-            //         // addLine(qId, selectedSource, target);
-
-            //         requestAnimationFrame(() => {
-            //             addLine(qId, sourceEl, targetEl);
-            //         });
-
-
-            //         if (!mappings[qId]) mappings[qId] = {};
-            //         mappings[qId][sourceText] = targetText;
-
-            //         document.getElementById(`match-result-${qId}`).value = JSON.stringify(mappings[qId]);
-            //         selectedSource.classList.remove('selected');
-            //         selectedSource.classList.add('connected');
-            //         selectedSource = null;
-            //     });
-            // });
-
-
         });
     </script>
 @endpush
+
