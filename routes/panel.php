@@ -26,6 +26,8 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
         Route::get('/enfant/concours', [ConcoursController::class, 'getConcoursByLevelEnfant']);
         Route::get('/enfant/concours/{id}', [ConcoursController::class, 'getConcoursBookAndInsertIconPlay']);
         Route::post('/quizzes/submit/{id}', 'QuizController@submitFromChild')->name('panel.quiz.submit');
+        Route::post('/panel/quizzes/{id}/attempt', [QuizController::class, 'storeAttempt'])->name('panel.quiz.attempt.store');
+
         
 
         //-------------------------------------------------------------------------

@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Storage;
 use App\UserMatiere;
 use App\Models\School_level;
 use App\Models\Material;
-use App\Models\QuizSubmission;
+use App\Models\QuizSubmissions;
+use App\Models\QuizAttemptScore;
+
 use App\Models\User;
 
 class QuizController extends Controller
@@ -589,44 +591,197 @@ class QuizController extends Controller
     public function submitFromChild(Request $request, $id)
     {
         $quiz = Quiz::with('questions.answers')->findOrFail($id);
+        $childId = auth()->id(); // enfant connecté
         $answers = $request->input('answers', []);
+
+        // ➤ 1. Dernière tentative (s'il y en a)
+        $lastAttempt = QuizAttemptScore::where('quiz_id', $quiz->id)->where('child_id', $childId)->orderByDesc('attempt_number')->first();
+
+        $attemptNumber = $lastAttempt ? $lastAttempt->attempt_number + 1 : 1;
+
+        // ➤ 2. Calcul du score total du quiz
+        $totalScore = $quiz->questions->sum('score');
+
+        // ➤ 3. Création de la tentative
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'attempt_number' => $attemptNumber,
+            'score' => 0, // temporaire
+            'score_total' => $totalScore,
+            'submitted_at' => now(),
+        ]);
+
+        // ➤ 4. Initialisation du score réel
         $score = 0;
 
         foreach ($quiz->questions as $question) {
             $userAnswer = $answers[$question->id] ?? null;
+            $isValid = false;
 
             if ($question->type === 'binaire') {
-                $correct = $question->is_valid ? 'true' : 'false';
-                if ($userAnswer === $correct) {
-                    $score++;
-                }
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isValid = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => true,
+                ]);
             } elseif ($question->type === 'qcm') {
-                $correctIds = $question->answers->where('is_valid', true)->pluck('id')->toArray();
-                if (in_array($userAnswer, $correctIds)) {
-                    $score++;
-                }
+                $expectedId = $question->answers->where('is_valid', true)->first()?->id;
+                $isValid = $userAnswer == $expectedId;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'answer_id' => $userAnswer,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
             } elseif ($question->type === 'arrow') {
-                $correctCount = 0;
-                foreach ($question->answers as $i => $a) {
-                    $expected = $a->matching;
-                    $childValue = $userAnswer[$i] ?? null;
-                    if ($childValue === $expected) {
-                        $correctCount++;
+                $expectedMap = $question->answers->mapWithKeys(fn($a) => [$a->answer_text => $a->matching])->toArray();
+                $userMap = is_string($userAnswer) ? json_decode($userAnswer, true) : $userAnswer ?? [];
+                $isValid = $userMap == $expectedMap;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'arrow_mapping' => json_encode($userMap),
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
+            }
+
+            if ($isValid) {
+                $score += $question->score;
+            }
+        }
+
+        // ➤ 5. Mise à jour du score final
+        $attempt->update(['score' => $score]);
+
+        // ➤ 6. Redirection vers la page des résultats
+        return view('web.default.panel.quiz.child.result', [
+            'quiz' => $quiz,
+            'attempt' => $attempt,
+            'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
+        ]);
+    }
+    public function storeAttempt(Request $request, $quiz_id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($quiz_id);
+        $childId = auth()->id();
+        $submittedAnswers = $request->input('answers', []);
+
+        // ➤ Calcul total score
+        $score = 0;
+        $score_total = $quiz->questions->sum('score');
+
+        // ➤ Créer l'enregistrement de tentative
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'score' => 0, // mis à jour plus tard
+            'score_total' => $score_total,
+            'submitted_at' => now(),
+        ]);
+
+        // ➤ Parcourir chaque question
+        foreach ($quiz->questions as $question) {
+            $qId = $question->id;
+            $userAnswer = $submittedAnswers[$qId] ?? null;
+
+            // ➤ Type QCM
+            if ($question->type === 'qcm' && $userAnswer) {
+                $answer = Answer::find($userAnswer);
+                $isCorrect = $answer?->is_valid == 1;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => $answer?->id,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+
+            // ➤ Type Binaire
+            elseif ($question->type === 'binaire' && $userAnswer !== null) {
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isCorrect = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => true,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+
+            // ➤ Type Arrow (matching)
+            elseif ($question->type === 'arrow' && is_array($userAnswer)) {
+                $correctPairs = $question->answers
+                    ->mapWithKeys(function ($a) {
+                        return [$a->answer_text => $a->matching];
+                    })
+                    ->toArray();
+
+                $isCorrect = true;
+                foreach ($correctPairs as $source => $target) {
+                    if (($userAnswer[$source] ?? null) !== $target) {
+                        $isCorrect = false;
+                        break;
                     }
                 }
-                if ($correctCount === count($question->answers)) {
-                    $score++;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'arrow_mapping' => $userAnswer,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
                 }
             }
         }
 
-        QuizSubmission::create([
-            'quiz_id' => $quiz->id,
-            'child_id' => auth()->id(),
-            'score' => $score,
-            'answers' => json_encode($answers),
-        ]);
+        // ➤ Mise à jour du score dans la tentative
+        $attempt->update(['score' => $score]);
 
-        return view('web.default.panel.quiz.child.result', compact('quiz', 'score', 'answers'));
+        // ➤ Récupération des réponses pour l'affichage
+        $submissions = QuizSubmissions::with('question', 'answer')->where('attempt_id', $attempt->id)->get();
+
+        return view('web.default.panel.quiz.child.result', [
+            'quiz' => $quiz,
+            'attempt' => $attempt,
+            'submissions' => $submissions,
+        ]);
     }
 }
