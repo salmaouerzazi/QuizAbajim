@@ -29,6 +29,8 @@
     "dependencies": {
         "agora-rtm-sdk": "^1.4.3-203",
         "feather-icons": "^4.28.0",
+        "laravel-echo": "^2.1.4",
+        "pusher-js": "^8.4.0",
         "sweetalert2": "^9.17.1",
         "swiper": "^10.0.4"
     }

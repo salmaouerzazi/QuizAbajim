@@ -7,6 +7,8 @@ use App\Http\Controllers\Web\MeetingController;
 use App\Http\Controllers\Panel\CardReservationController;
 use App\Http\Controllers\Panel\ConcoursController;
 use App\Http\Controllers\Panel\QuizController;
+use App\Http\Controllers\QuizNotificationController;
+
 /*
 |--------------------------------------------------------------------------
 | User Panel Routes
@@ -26,9 +28,6 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
         Route::get('/enfant/concours', [ConcoursController::class, 'getConcoursByLevelEnfant']);
         Route::get('/enfant/concours/{id}', [ConcoursController::class, 'getConcoursBookAndInsertIconPlay']);
         Route::post('/quizzes/submit/{id}', 'QuizController@submitFromChild')->name('panel.quiz.submit');
-        Route::post('/panel/quizzes/{id}/attempt', [QuizController::class, 'storeAttempt'])->name('panel.quiz.attempt.store');
-
-        
 
         //-------------------------------------------------------------------------
 
@@ -109,6 +108,9 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
         Route::delete('/quizzes/{id}', 'QuizController@destroy')->name('panel.quiz.destroy');
         Route::post('/quizzes/assign-to-chapter', 'QuizController@assignToChapter')->name('panel.quiz.assignToChapter');
         Route::post('/quizzes/delete', 'QuizController@delete')->name('panel.quiz.delete');
+
+        // ----> Notification quiz aux enfants par niveau (enseignant)
+        Route::post('/quiz-notifications/send-to-level', [QuizNotificationController::class, 'sendToLevel'])->name('panel.quiz_notifications.send');
 
         // -----> Notification routes ---------------------------------------------------------
         Route::group(['prefix' => 'notifications'], function () {
