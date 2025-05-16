@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\BroadcastMessage;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Bus\Queueable;
 
 
 class NewQuizNotification extends Notification implements ShouldQueue

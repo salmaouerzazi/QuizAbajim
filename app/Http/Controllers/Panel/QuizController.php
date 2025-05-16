@@ -17,7 +17,7 @@ use App\Models\Material;
 use App\Models\QuizSubmissions;
 use App\Models\QuizAttemptScore;
 
-use App\Models\User;
+use App\User;
 
 class QuizController extends Controller
 {
@@ -202,15 +202,14 @@ class QuizController extends Controller
 
         DB::commit();
         $quiz->load(['teacher', 'material']);
-        $children = User::where('role', 'child')
-            ->where('level_id', $quiz->level_id)
-            ->where('material_id', $quiz->material_id) // ou utiliser une relation si besoin
-            ->get();
 
-        // Envoyer la notification
-        foreach ($children as $child) {
-            $child->notify(new \App\Notifications\NewQuizNotification($quiz));
-        }
+        // $children = User::where('role_name', 'enfant')->where('level_id', $quiz->level_id)->get();
+
+        // if ($children) {
+        //     foreach ($children as $child) {
+        //         $child->notify(new \App\Notifications\NewQuizNotification($quiz));
+        //     }
+        // }
 
         return redirect()->route('panel.quiz.edit', ['id' => $quiz->id]);
         // } catch (\Exception $e) {
@@ -559,18 +558,95 @@ class QuizController extends Controller
     }
     public function assignToChapter(Request $request)
     {
-        $request->validate([
-            'quiz_id' => 'required|exists:quiz,id',
-            'chapter_id' => 'required|exists:webinar_chapters,id',
-        ]);
+        try {
+            // 1. Valider la requête
+            $request->validate([
+                'quiz_id' => 'required|exists:quiz,id',
+                'chapter_id' => 'required|exists:webinar_chapters,id',
+            ]);
 
-        $quiz = Quiz::findOrFail($request->quiz_id);
-        $quiz->model_type = \App\Models\WebinarChapter::class;
-        $quiz->model_id = $request->chapter_id;
-        $quiz->status = 'published';
+            // 2. Associer le quiz au chapitre - c'est l'opération principale
+            $quiz = Quiz::findOrFail($request->quiz_id);
+            $quiz->model_type = 'App\\Models\\WebinarChapter';
+            $quiz->model_id = $request->chapter_id;
+            $quiz->status = 'published';
+            $quiz->save();
 
-        $quiz->save();
-        return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+            // 3. Créer une notification principale
+            try {
+                $chapter = \App\Models\WebinarChapter::find($request->chapter_id);
+                if ($chapter) {
+                    $notification = new \App\QuizNotification();
+                    $notification->title = 'Nouveau quiz disponible';
+                    $notification->message = 'Un nouveau quiz "' . $quiz->title . '" est disponible dans le chapitre "' . $chapter->title . '"';
+                    $notification->quiz_id = $quiz->id;
+                    $notification->sender_type = 'admin';
+                    $notification->sender_id = auth()->id();
+                    $notification->target_type = 'multiple';
+                    $notification->save();
+
+                    \Log::info('Notification créée: ' . $notification->id);
+
+                    // 4. Créer des notifications pour chaque enfant dans le système
+                    try {
+                        // Utiliser une requête brute pour récupérer les enfants avec la bonne colonne et valeur
+                        $children = DB::select("SELECT id FROM users WHERE role_name = 'enfant'");
+                        $childrenCount = count($children);
+                        \Log::info('Nombre d\'enfants trouvés (SQL brut): ' . $childrenCount);
+                    } catch (\Exception $e) {
+                        \Log::error('Erreur lors de la récupération des enfants: ' . $e->getMessage());
+                        $children = [];
+                    }
+
+                    // Déboguer la structure de la table
+                    try {
+                        $tableInfo = DB::select('SHOW COLUMNS FROM quiz_notifications_users');
+                        \Log::info('Structure de la table quiz_notifications_users: ' . json_encode($tableInfo));
+                    } catch (\Exception $e) {
+                        \Log::error('Erreur lors de la vérification de la structure de la table: ' . $e->getMessage());
+                    }
+
+                    foreach ($children as $child) {
+                        $childId = $child->id;
+                        \Log::info('Traitement de l\'enfant ID: ' . $childId);
+
+                        try {
+                            // Méthode directe - Insert dans la base de données
+                            DB::statement(
+                                "INSERT INTO quiz_notifications_users
+                                 (notification_id, receiver_id, is_read, created_at, updated_at)
+                                 VALUES (?, ?, ?, ?, ?)",
+                                [$notification->id, $childId, 0, now(), now()],
+                            );
+                            \Log::info('Notification utilisateur créée pour enfant ' . $childId . ' avec DB::statement');
+                        } catch (\Exception $e) {
+                            \Log::error('Erreur lors de la création de notification (DB::statement): ' . $e->getMessage());
+
+                            // Essayer une autre méthode en dernier recours
+                            try {
+                                $insertSQL = "INSERT INTO quiz_notifications_users
+                                             (notification_id, receiver_id, is_read, created_at, updated_at)
+                                             VALUES ({$notification->id}, {$childId}, 0, NOW(), NOW())";
+                                DB::unprepared($insertSQL);
+                                \Log::info('Notification utilisateur créée pour enfant ' . $childId . ' avec DB::unprepared');
+                            } catch (\Exception $e2) {
+                                \Log::error('Erreur lors de la création de notification (DB::unprepared): ' . $e2->getMessage());
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $notifError) {
+                // Log l'erreur mais ne pas bloquer l'assignation
+                \Log::error('Erreur création notification: ' . $notifError->getMessage());
+            }
+
+            // 5. Retourner une réponse JSON de succès
+            return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+        } catch (\Exception $e) {
+            // Capturer toutes les erreurs et renvoyer une réponse JSON avec l'erreur
+            \Log::error('Erreur assignToChapter: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
+        }
     }
     public function delete(Request $request)
     {
@@ -677,6 +753,115 @@ class QuizController extends Controller
             'quiz' => $quiz,
             'attempt' => $attempt,
             'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
+        ]);
+    }
+    public function storeAttempt(Request $request, $quiz_id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($quiz_id);
+        $childId = auth()->id();
+        $submittedAnswers = $request->input('answers', []);
+
+        // ➤ Calcul total score
+        $score = 0;
+        $score_total = $quiz->questions->sum('score');
+
+        // ➤ Créer l'enregistrement de tentative
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'score' => 0, // mis à jour plus tard
+            'score_total' => $score_total,
+            'submitted_at' => now(),
+        ]);
+
+        // ➤ Parcourir chaque question
+        foreach ($quiz->questions as $question) {
+            $qId = $question->id;
+            $userAnswer = $submittedAnswers[$qId] ?? null;
+
+            // ➤ Type QCM
+            if ($question->type === 'qcm' && $userAnswer) {
+                $answer = Answer::find($userAnswer);
+                $isCorrect = $answer?->is_valid == 1;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => $answer?->id,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+
+            // ➤ Type Binaire
+            elseif ($question->type === 'binaire' && $userAnswer !== null) {
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isCorrect = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => true,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+
+            // ➤ Type Arrow (matching)
+            elseif ($question->type === 'arrow' && is_array($userAnswer)) {
+                $correctPairs = $question->answers
+                    ->mapWithKeys(function ($a) {
+                        return [$a->answer_text => $a->matching];
+                    })
+                    ->toArray();
+
+                $isCorrect = true;
+                foreach ($correctPairs as $source => $target) {
+                    if (($userAnswer[$source] ?? null) !== $target) {
+                        $isCorrect = false;
+                        break;
+                    }
+                }
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'arrow_mapping' => $userAnswer,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+        }
+
+        // ➤ Mise à jour du score dans la tentative
+        $attempt->update(['score' => $score]);
+
+        // ➤ Récupération des réponses pour l'affichage
+        $submissions = QuizSubmissions::with('question', 'answer')->where('attempt_id', $attempt->id)->get();
+
+        return view('web.default.panel.quiz.child.result', [
+            'quiz' => $quiz,
+            'attempt' => $attempt,
+            'submissions' => $submissions,
         ]);
     }
 }

@@ -21,17 +21,22 @@ class QuizNotification extends Model
         'receiver_id',
     ];
 
+    // 🔁 Notification envoyée à plusieurs enfants (relation avec la table pivot)
     //  Notification envoyée à plusieurs enfants (relation avec la table pivot)
     public function receivers(): HasMany
     {
         return $this->hasMany(QuizNotificationUsers::class, 'notification_id');
     }
 
+    // 🔁 Notification envoyée à un seul enfant (cas single)
     //  Notification envoyée à un seul enfant (cas single)
     public function singleReceiver()
     {
         return $this->belongsTo(User::class, 'receiver_id');
     }
+
+
+    // 🔁 Émetteur (admin ou système)
 
     //  Émetteur (admin ou système)
     public function sender()

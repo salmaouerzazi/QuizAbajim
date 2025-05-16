@@ -191,7 +191,7 @@
                     ->orderByDesc('created_at')
                     ->take(5)
                     ->get();
-
+                
                 $unreadCount = $notifications->where('is_read', false)->count();
             @endphp
             <div class="dropdown me-3">
