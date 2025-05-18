@@ -559,37 +559,35 @@ class QuizController extends Controller
     public function assignToChapter(Request $request)
     {
         try {
-            // 1. Valider la requête
             $request->validate([
                 'quiz_id' => 'required|exists:quiz,id',
                 'chapter_id' => 'required|exists:webinar_chapters,id',
             ]);
 
-            // 2. Associer le quiz au chapitre - c'est l'opération principale
             $quiz = Quiz::findOrFail($request->quiz_id);
             $quiz->model_type = 'App\\Models\\WebinarChapter';
             $quiz->model_id = $request->chapter_id;
             $quiz->status = 'published';
             $quiz->save();
 
-            // 3. Créer une notification principale
+            //  Créer une notification principale
             try {
                 $chapter = \App\Models\WebinarChapter::find($request->chapter_id);
                 if ($chapter) {
                     $notification = new \App\QuizNotification();
-                    $notification->title = 'Nouveau quiz disponible';
-                    $notification->message = 'Un nouveau quiz "' . $quiz->title . '" est disponible dans le chapitre "' . $chapter->title . '"';
+                    $notification->title = 'هل أنت جاهز للتحدي؟';
+                    $notification->message = '🔥 اختبار جديد "' . $quiz->title . '" في الفصل "' . $chapter->title . '" بانتظارك! أظهر قوتك وأبهر الجميع بنتيجتك! 🏆';
                     $notification->quiz_id = $quiz->id;
                     $notification->sender_type = 'admin';
                     $notification->sender_id = auth()->id();
                     $notification->target_type = 'multiple';
+                   
                     $notification->save();
 
                     \Log::info('Notification créée: ' . $notification->id);
 
-                    // 4. Créer des notifications pour chaque enfant dans le système
+                    // Créer des notifications pour chaque enfant dans le système
                     try {
-                        // Utiliser une requête brute pour récupérer les enfants avec la bonne colonne et valeur
                         $children = DB::select("SELECT id FROM users WHERE role_name = 'enfant'");
                         $childrenCount = count($children);
                         \Log::info('Nombre d\'enfants trouvés (SQL brut): ' . $childrenCount);
@@ -598,7 +596,6 @@ class QuizController extends Controller
                         $children = [];
                     }
 
-                    // Déboguer la structure de la table
                     try {
                         $tableInfo = DB::select('SHOW COLUMNS FROM quiz_notifications_users');
                         \Log::info('Structure de la table quiz_notifications_users: ' . json_encode($tableInfo));
@@ -622,7 +619,6 @@ class QuizController extends Controller
                         } catch (\Exception $e) {
                             \Log::error('Erreur lors de la création de notification (DB::statement): ' . $e->getMessage());
 
-                            // Essayer une autre méthode en dernier recours
                             try {
                                 $insertSQL = "INSERT INTO quiz_notifications_users
                                              (notification_id, receiver_id, is_read, created_at, updated_at)
@@ -640,10 +636,8 @@ class QuizController extends Controller
                 \Log::error('Erreur création notification: ' . $notifError->getMessage());
             }
 
-            // 5. Retourner une réponse JSON de succès
             return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
         } catch (\Exception $e) {
-            // Capturer toutes les erreurs et renvoyer une réponse JSON avec l'erreur
             \Log::error('Erreur assignToChapter: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
         }
@@ -652,14 +646,11 @@ class QuizController extends Controller
     {
         $quiz = \App\Models\Quiz::findOrFail($request->quiz_id);
 
-        // Désaffecter le quiz
         $quiz->model_type = null;
         $quiz->model_id = null;
 
-        //  Remettre en draft car il n'est plus affecté
         $quiz->status = 'draft';
 
-        // Enregistrer
         $quiz->save();
 
         return back()->with('success', 'تم إلغاء ربط التحدي بنجاح.');
@@ -668,7 +659,6 @@ class QuizController extends Controller
     {
         $quiz = Quiz::with('questions.answers')->findOrFail($id);
 
-        // Si le quiz est lié à un chapitre
         $chapter = \App\Models\WebinarChapter::where('id', $quiz->model_id)->first();
         $course = $chapter ? $chapter->webinar : null;
 
@@ -761,25 +751,21 @@ class QuizController extends Controller
         $childId = auth()->id();
         $submittedAnswers = $request->input('answers', []);
 
-        // ➤ Calcul total score
         $score = 0;
         $score_total = $quiz->questions->sum('score');
 
-        // ➤ Créer l'enregistrement de tentative
         $attempt = QuizAttemptScore::create([
             'quiz_id' => $quiz->id,
             'child_id' => $childId,
-            'score' => 0, // mis à jour plus tard
+            'score' => 0, 
             'score_total' => $score_total,
             'submitted_at' => now(),
         ]);
 
-        // ➤ Parcourir chaque question
         foreach ($quiz->questions as $question) {
             $qId = $question->id;
             $userAnswer = $submittedAnswers[$qId] ?? null;
 
-            // ➤ Type QCM
             if ($question->type === 'qcm' && $userAnswer) {
                 $answer = Answer::find($userAnswer);
                 $isCorrect = $answer?->is_valid == 1;
@@ -799,7 +785,6 @@ class QuizController extends Controller
                 }
             }
 
-            // ➤ Type Binaire
             elseif ($question->type === 'binaire' && $userAnswer !== null) {
                 $expected = $question->is_valid ? 'true' : 'false';
                 $isCorrect = $userAnswer === $expected;
@@ -819,7 +804,6 @@ class QuizController extends Controller
                 }
             }
 
-            // ➤ Type Arrow (matching)
             elseif ($question->type === 'arrow' && is_array($userAnswer)) {
                 $correctPairs = $question->answers
                     ->mapWithKeys(function ($a) {
@@ -852,10 +836,9 @@ class QuizController extends Controller
             }
         }
 
-        // ➤ Mise à jour du score dans la tentative
         $attempt->update(['score' => $score]);
 
-        // ➤ Récupération des réponses pour l'affichage
+        //  Récupération des réponses pour l'affichage
         $submissions = QuizSubmissions::with('question', 'answer')->where('attempt_id', $attempt->id)->get();
 
         return view('web.default.panel.quiz.child.result', [

@@ -57,60 +57,42 @@ class QuizNotificationController extends Controller
         return view('web.default.includes.notifications', compact('notifications'));
     }
     public function ajaxNotifications()
-{
-    try {
-        $user = auth()->user();
-
-        $notifications = \App\QuizNotificationUsers::with('notification')
+    {
+        try {
+            $user = auth()->user();
+    
+            $notifications = \App\QuizNotificationUsers::with([
+                'notification.quiz.model.webinar'
+            ])
             ->where('receiver_id', $user->id)
             ->orderByDesc('created_at')
-            ->take(5)
+            ->take(3)
             ->get();
-
-        $unreadCount = $notifications->where('is_read', false)->count();
-
-        // Vérifier si la vue existe
-        if (view()->exists('web.default.includes.notification_dropdown')) {
-            $html = view('web.default.includes.notification_dropdown', compact('notifications', 'unreadCount'))->render();
-        } else if (view()->exists('web.default.includes.notification-dropdown')) {
-            // Essayer avec le tiret si la version avec underscore n'existe pas
-            $html = view('web.default.includes.notification-dropdown', compact('notifications', 'unreadCount'))->render();
-        } else {
-            // Fallback simple si aucune des vues n'existe
-            $html = '<div>Notifications: ' . $unreadCount . '</div>';
+    
+            $unreadCount = $notifications->where('is_read', false)->count();
+    
+            if (view()->exists('web.default.includes.notification_dropdown')) {
+                $html = view('web.default.includes.notification_dropdown', compact('notifications', 'unreadCount'))->render();
+            } elseif (view()->exists('web.default.includes.notification-dropdown')) {
+                $html = view('web.default.includes.notification-dropdown', compact('notifications', 'unreadCount'))->render();
+            } else {
+                $html = '<div>Notifications: ' . $unreadCount . '</div>';
+            }
+    
+            return response()->json([
+                'html' => $html,
+                'unreadCount' => $unreadCount
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erreur dans ajaxNotifications: ' . $e->getMessage());
+            return response()->json([
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
-
-        return response()->json([
-            'html' => $html,
-            'unreadCount' => $unreadCount
-        ]);
-    } catch (\Exception $e) {
-        // Journaliser l'erreur et retourner une réponse informative
-        \Log::error('Erreur dans ajaxNotifications: ' . $e->getMessage());
-        return response()->json([
-            'error' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ], 500);
     }
-
-    $user = auth()->user();
-
-    $notifications = \App\Models\QuizNotificationUsers::with('notification')
-        ->where('receiver_id', $user->id)
-        ->orderByDesc('created_at')
-        ->take(5)
-        ->get();
-
-    $unreadCount = $notifications->where('is_read', false)->count();
-
-    $html = view('web.default.includes.notification_dropdown', compact('notifications', 'unreadCount'))->render();
-
-    return response()->json([
-        'html' => $html,
-        'unreadCount' => $unreadCount
-    ]);
-}
+    
 
 
     /**

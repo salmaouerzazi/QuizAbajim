@@ -85,6 +85,159 @@
     .btn-primary {
         background: linear-gradient(45deg, #0056b3, #31a2b8);
     }
+
+    /* Styles pour la cloche de notification */
+    .notification-bell-container {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    .notification-bell {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, rgba(106, 17, 203, 0.05), rgba(37, 117, 252, 0.1));
+    }
+
+    .notification-bell:hover {
+        background: linear-gradient(135deg, rgba(106, 17, 203, 0.1), rgba(37, 117, 252, 0.2));
+        transform: translateY(-2px);
+    }
+
+    .notification-icon {
+        font-size: 18px;
+        color: #2575fc;
+        transition: all 0.3s ease;
+        animation: swing 2s infinite;
+        transform-origin: top center;
+    }
+
+    .notification-bell:hover .notification-icon {
+        color: #6a11cb;
+    }
+
+    .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: linear-gradient(135deg, #ff3e3e 0%, #ff7676 100%);
+        color: white;
+        font-size: 11px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(255, 62, 62, 0.4);
+    }
+
+    .notification-dropdown {
+        min-width: 320px;
+        padding: 0;
+        border-radius: 15px;
+        border: none;
+        overflow: hidden;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Animations */
+    .pulse {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(255, 62, 62, 0.6);
+        }
+
+        70% {
+            box-shadow: 0 0 0 8px rgba(255, 62, 62, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(255, 62, 62, 0);
+        }
+    }
+
+    @keyframes swing {
+        20% {
+            transform: rotate(8deg);
+        }
+
+        40% {
+            transform: rotate(-8deg);
+        }
+
+        60% {
+            transform: rotate(4deg);
+        }
+
+        80% {
+            transform: rotate(-4deg);
+        }
+
+        100% {
+            transform: rotate(0deg);
+        }
+    }
+
+    .notification-bell.has-new {
+        animation: ring 1.5s ease;
+    }
+
+    @keyframes ring {
+        0% {
+            transform: rotate(0);
+        }
+
+        5% {
+            transform: rotate(15deg);
+        }
+
+        10% {
+            transform: rotate(-15deg);
+        }
+
+        15% {
+            transform: rotate(15deg);
+        }
+
+        20% {
+            transform: rotate(-15deg);
+        }
+
+        25% {
+            transform: rotate(15deg);
+        }
+
+        30% {
+            transform: rotate(-15deg);
+        }
+
+        35% {
+            transform: rotate(15deg);
+        }
+
+        40% {
+            transform: rotate(-15deg);
+        }
+
+        45% {
+            transform: rotate(0);
+        }
+
+        100% {
+            transform: rotate(0);
+        }
+    }
 </style>
 
 <div id="navbarVacuum"></div>
@@ -189,140 +342,142 @@
                 $notifications = QuizNotificationUsers::with('notification')
                     ->where('receiver_id', $authUser->id)
                     ->orderByDesc('created_at')
-                    ->take(5)
+                    ->where('is_read', false)
                     ->get();
-                
+
                 $unreadCount = $notifications->where('is_read', false)->count();
             @endphp
             <div class="dropdown me-3">
-                <a class="nav-link dropdown-toggle position-relative" href="#" role="button"
-                   id="notifDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
-                   style="font-size: 20px; color: #333;">
-                    <i class="fas fa-bell"></i>
-                    @if($unreadCount > 0)
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                            {{ $unreadCount }}
-                        </span>
-                    @endif
+                <a class="nav-link position-relative notification-bell-container" href="#" role="button"
+                    id="notifDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <div class="notification-bell" onclick="testNotificationSound(event)">
+                        <i class="fas fa-bell notification-icon"></i>
+                        @if ($unreadCount > 0)
+                            <span class="notification-badge pulse">{{ $unreadCount }}</span>
+                        @endif
+                    </div>
                 </a>
-            
-                <div id="notifDropdownContainer" class="dropdown-menu dropdown-menu-right shadow-sm p-2" aria-labelledby="notifDropdown" style="min-width: 300px; max-height: 300px; overflow-y: auto;">
+
+                <div id="notifDropdownContainer" class="dropdown-menu dropdown-menu-right shadow notification-dropdown"
+                    aria-labelledby="notifDropdown">
                     @include('web.default.includes.notification_dropdown')
                 </div>
-            </div>
-            </div>
-            
 
-            <ul class="avatars">
-                @if (!empty($enfant))
-                    @if ($countenfant < 4)
-                        <li class="avatars__item">
-                            <span class="avatars__others" data-toggle="modal" data-target="#exampleModal"
-                                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                                title="{{ trans('panel.add_child_here') }}">+</span>
-                        </li>
-                    @endif
-                    @foreach ($enfant as $enf)
-                        <a href="/panel/impersonate/user/{{ $enf->id }}">
-                            <li class="avatars__item child-name" data-level-path="{{ $enf->path }}">
-                                <img src="{{ $enf->getAvatar() }}" class="avatars__img"
-                                    style="
-                        @if ($enf->id !== $authUser->id) scale: 0.8; @endif"
-                                    data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-html="true"
-                                    title="{{ $enf->full_name }}" />
-                                @if ($enf->id == $authUser->id)
-                                    <span class="online-dot"></span>
-                                @endif
-                            </li>
-                        </a>
-                    @endforeach
-                @endif
-
-            </ul>
-
-
-            <div class="nav-icons-or-start-live navbar-order">
-                @if (empty($authUser))
-                    <a href="{{ empty($authUser) ? '/Instructor/register' : ($authUser->isAdmin() ? '/admin/webinars/create' : ($authUser->isVisiteur() ? '/become_instructor' : '/panel/webinars/new')) }}"
-                        class="d-none d-lg-flex btn btn-sm btn-primary nav-start-a-live-btn">
-                        Become Instructor
-                    </a>
-                @endif
-                <div class="d-none nav-notify-cart-dropdown top-navbar">
-                    @if ($authUser->isEnfant())
-                        <?php
-                        $userparent = \App\User::where('id', $authUser->organ_id)->get();
-                        $idOrgan = DB::table('users')->where('id', $authUser->id)->pluck('organ_id');
-                        ?>
-                        <a href="#" class="navbar-user d-flex align-items-center ml-25" type="button"
-                            id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true"
-                            aria-expanded="false">
-                            @if (!empty($userparent[0]->avatar))
-                                <img src="{{ $userparent[0]->getAvatar(100) }}" class="rounded-circle desktop-avatar"
-                                    alt="{{ $userparent[0]->full_name }}">
-                            @else
-                                <img src="{{ $userparent[0]->getAvatar(100) }}" class="rounded-circle desktop-avatar"
-                                    alt="{{ $userparent[0]->full_name }}">
-                            @endif
-                        </a>
-                        <div class="dropdown-menu user-profile-dropdown" aria-labelledby="dropdownMenuButton">
-                            <div class="d-md-none border-bottom mb-20 pb-10 text-right">
-                                <i class="close-dropdown" data-feather="x" width="32" height="32"
-                                    class="mr-10"></i>
-                            </div>
-                            <span
-                                class="font-16 user-name ml-10 text-dark-blue font-16">{{ $userparent[0]->full_name }}
-                            </span>
-                            <hr class="mt-10 mb-10">
-
-
-                            <a class="dropdown-item"
-                                href="{{ route('parent.setting', ['user_id' => $authUser->id]) }}">
-                                @include('web.default.panel.includes.sidebar_icons.setting')
-                                <span class="font-16 text-dark-blue">{{ trans('panel.settings') }}</span>
-                            </a>
-                            <a class="dropdown-item" href="/logout">
-                                <img src="/assets/default/img/icons/sidebar/logout.svg" width="25"
-                                    alt="nav-icon">
-                                <span class="font-16 text-dark-blue">{{ trans('panel.log_out') }}</span>
-                            </a>
-                        </div>
-                    @elseif ($authUser->isOrganization())
-                        <a href="#" class="navbar-user d-flex align-items-center ml-25" type="button"
-                            id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true"
-                            aria-expanded="false">
-                            @if (!empty($authUser->avatar))
-                                <img src="{{ $authUser->getAvatar(100) }}" class="rounded-circle desktop-avatar"
-                                    alt="{{ $authUser->full_name }}">
-                            @else
-                                <img src="{{ $authUser->getAvatar(100) }}" class="rounded-circle desktop-avatar"
-                                    alt="{{ $authUser->full_name }}">
-                            @endif
-                        </a>
-                        <div class="dropdown-menu user-profile-dropdown" aria-labelledby="dropdownMenuButton">
-                            <div class="d-md-none border-bottom mb-20 pb-10 text-right">
-                                <i class="close-dropdown" data-feather="x" width="32" height="32"
-                                    class="mr-10"></i>
-                            </div>
-                            <span class="font-16 user-name ml-10 text-dark-blue font-16">{{ $authUser->full_name }}
-                            </span>
-                            <hr class="mt-10 mb-10">
-
-
-                            <a class="dropdown-item" href="/panel/setting">
-                                @include('web.default.panel.includes.sidebar_icons.setting')
-                                <span class="font-16 text-dark-blue">{{ trans('panel.settings') }}</span>
-                            </a>
-                            <a class="dropdown-item" href="/logout">
-                                <img src="/assets/default/img/icons/sidebar/logout.svg" width="25"
-                                    alt="nav-icon">
-                                <span class="font-16 text-dark-blue">{{ trans('panel.log_out') }}</span>
-                            </a>
-                        </div>
-                    @endif
-                </div>
+                <!-- Sons de notification -->
+                <audio id="notificationSound" preload="auto">
+                    <source src="{{ asset('assets/default/sounds/notification.mp3') }}" type="audio/mpeg">
+                </audio>
+                <audio id="clickSound" preload="auto">
+                    <source src="{{ asset('assets/default/sounds/click.mp3') }}" type="audio/mpeg">
+                </audio>
             </div>
         </div>
+
+
+        <ul class="avatars">
+            @if (!empty($enfant))
+                @if ($countenfant < 4)
+                    <li class="avatars__item">
+                        <span class="avatars__others" data-toggle="modal" data-target="#exampleModal"
+                            data-bs-toggle="tooltip" data-bs-placement="bottom"
+                            title="{{ trans('panel.add_child_here') }}">+</span>
+                    </li>
+                @endif
+                @foreach ($enfant as $enf)
+                    <a href="/panel/impersonate/user/{{ $enf->id }}">
+                        <li class="avatars__item child-name" data-level-path="{{ $enf->path }}">
+                            <img src="{{ $enf->getAvatar() }}" class="avatars__img"
+                                style="
+                        @if ($enf->id !== $authUser->id) scale: 0.8; @endif"
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-html="true"
+                                title="{{ $enf->full_name }}" />
+                            @if ($enf->id == $authUser->id)
+                                <span class="online-dot"></span>
+                            @endif
+                        </li>
+                    </a>
+                @endforeach
+            @endif
+
+        </ul>
+
+
+        <div class="nav-icons-or-start-live navbar-order">
+            @if (empty($authUser))
+                <a href="{{ empty($authUser) ? '/Instructor/register' : ($authUser->isAdmin() ? '/admin/webinars/create' : ($authUser->isVisiteur() ? '/become_instructor' : '/panel/webinars/new')) }}"
+                    class="d-none d-lg-flex btn btn-sm btn-primary nav-start-a-live-btn">
+                    Become Instructor
+                </a>
+            @endif
+            <div class="d-none nav-notify-cart-dropdown top-navbar">
+                @if ($authUser->isEnfant())
+                    <?php
+                    $userparent = \App\User::where('id', $authUser->organ_id)->get();
+                    $idOrgan = DB::table('users')->where('id', $authUser->id)->pluck('organ_id');
+                    ?>
+                    <a href="#" class="navbar-user d-flex align-items-center ml-25" type="button"
+                        id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        @if (!empty($userparent[0]->avatar))
+                            <img src="{{ $userparent[0]->getAvatar(100) }}" class="rounded-circle desktop-avatar"
+                                alt="{{ $userparent[0]->full_name }}">
+                        @else
+                            <img src="{{ $userparent[0]->getAvatar(100) }}" class="rounded-circle desktop-avatar"
+                                alt="{{ $userparent[0]->full_name }}">
+                        @endif
+                    </a>
+                    <div class="dropdown-menu user-profile-dropdown" aria-labelledby="dropdownMenuButton">
+                        <div class="d-md-none border-bottom mb-20 pb-10 text-right">
+                            <i class="close-dropdown" data-feather="x" width="32" height="32"
+                                class="mr-10"></i>
+                        </div>
+                        <span class="font-16 user-name ml-10 text-dark-blue font-16">{{ $userparent[0]->full_name }}
+                        </span>
+                        <hr class="mt-10 mb-10">
+
+
+                        <a class="dropdown-item" href="{{ route('parent.setting', ['user_id' => $authUser->id]) }}">
+                            @include('web.default.panel.includes.sidebar_icons.setting')
+                            <span class="font-16 text-dark-blue">{{ trans('panel.settings') }}</span>
+                        </a>
+                        <a class="dropdown-item" href="/logout">
+                            <img src="/assets/default/img/icons/sidebar/logout.svg" width="25" alt="nav-icon">
+                            <span class="font-16 text-dark-blue">{{ trans('panel.log_out') }}</span>
+                        </a>
+                    </div>
+                @elseif ($authUser->isOrganization())
+                    <a href="#" class="navbar-user d-flex align-items-center ml-25" type="button"
+                        id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        @if (!empty($authUser->avatar))
+                            <img src="{{ $authUser->getAvatar(100) }}" class="rounded-circle desktop-avatar"
+                                alt="{{ $authUser->full_name }}">
+                        @else
+                            <img src="{{ $authUser->getAvatar(100) }}" class="rounded-circle desktop-avatar"
+                                alt="{{ $authUser->full_name }}">
+                        @endif
+                    </a>
+                    <div class="dropdown-menu user-profile-dropdown" aria-labelledby="dropdownMenuButton">
+                        <div class="d-md-none border-bottom mb-20 pb-10 text-right">
+                            <i class="close-dropdown" data-feather="x" width="32" height="32"
+                                class="mr-10"></i>
+                        </div>
+                        <span class="font-16 user-name ml-10 text-dark-blue font-16">{{ $authUser->full_name }}
+                        </span>
+                        <hr class="mt-10 mb-10">
+
+
+                        <a class="dropdown-item" href="/panel/setting">
+                            @include('web.default.panel.includes.sidebar_icons.setting')
+                            <span class="font-16 text-dark-blue">{{ trans('panel.settings') }}</span>
+                        </a>
+                        <a class="dropdown-item" href="/logout">
+                            <img src="/assets/default/img/icons/sidebar/logout.svg" width="25" alt="nav-icon">
+                            <span class="font-16 text-dark-blue">{{ trans('panel.log_out') }}</span>
+                        </a>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
     </div>
 </nav>
 
@@ -487,7 +642,6 @@
         }
 
     }
-
 </style>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -648,6 +802,198 @@
 
 @push('scripts_bottom')
     <script src="/assets/default/js/parts/navbar.min.js"></script>
+
+    <!-- Script pour la gestion des sons de notification -->
+    <script>
+        // Variable pour suivre si le son a été activé par une interaction utilisateur
+        let soundEnabled = false;
+
+        // Activer le son après une interaction utilisateur
+        document.addEventListener('click', function() {
+            soundEnabled = true;
+        }, {
+            once: true
+        });
+
+        // Fonction pour tester le son de notification (lors du clic sur la cloche)
+        function testNotificationSound(event) {
+            // Empêcher l'ouverture du dropdown si on fait un double-clic sur la cloche
+            if (event.detail > 1) { // détecter le double-clic
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Activer le son
+                soundEnabled = true;
+
+                // Jouer le son de notification
+                const sound = document.getElementById('notificationSound');
+                if (sound) {
+                    // Force le chargement du son
+                    sound.load();
+
+                    // Jouer le son avec volume normal
+                    sound.volume = 1.0;
+
+                    // Ajouter l'animation de sonnerie à la cloche
+                    const bell = event.currentTarget;
+                    bell.classList.add('has-new');
+
+                    // Essayer de jouer le son
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('Le son de notification fonctionne correctement!');
+                            })
+                            .catch(error => {
+                                console.error('Erreur lors de la lecture du son de notification:', error);
+                                alert(
+                                    'Le son ne peut pas être joué. Vérifiez les paramètres de votre navigateur pour autoriser le son sur ce site.');
+                            });
+                    }
+
+                    // Supprimer la classe d'animation après son exécution
+                    setTimeout(() => {
+                        bell.classList.remove('has-new');
+                    }, 1500);
+                }
+            }
+        }
+
+        // Fonction améliorée pour jouer le son de notification
+        function playNotificationSound() {
+            // Remarque : La vérification de soundEnabled est ignorée pour que le son se joue toujours
+            // lorsqu'une notification arrive
+
+            const sound = document.getElementById('notificationSound');
+            if (!sound) return;
+
+            // Forcer le chargement du son
+            sound.load();
+            sound.volume = 1.0;
+
+            // Activer la variable soundEnabled pour que les sons futurs fonctionnent aussi
+            soundEnabled = true;
+
+            // Essayer de jouer le son
+            try {
+                // Jouer le son de manière forcée
+                sound.currentTime = 0; // Réinitialiser la position de lecture
+                const playPromise = sound.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.error('Erreur lors de la lecture du son:', error);
+                        // Tentative alternative de lecture du son
+                        setTimeout(() => {
+                            sound.play().catch(() => {});
+                        }, 100);
+                    });
+                }
+            } catch (e) {
+                console.error('Erreur lors de la lecture du son:', e);
+            }
+
+            // Ajouter l'animation à la cloche
+            const bell = document.querySelector('.notification-bell');
+            if (bell) {
+                bell.classList.remove('has-new');
+                setTimeout(() => {
+                    bell.classList.add('has-new');
+                }, 10);
+            }
+        }
+
+        // Fonction pour jouer le son de clic
+        function playClickSound() {
+            if (!soundEnabled) return;
+
+            const sound = document.getElementById('clickSound');
+            if (!sound) return;
+
+            sound.volume = 0.5;
+            sound.load();
+            sound.play().catch(() => {});
+        }
+
+        // Écouter les nouvelles notifications via Echo (Laravel)
+        if (typeof Echo !== 'undefined') {
+            Echo.private("child.{{ auth()->id() }}")
+                .listen(".quiz.notification", (e) => {
+                    console.log('Nouvelle notification reçue:', e);
+
+                    // Jouer le son de notification
+                    playNotificationSound();
+
+                    // Mettre à jour le compteur de notifications dans la barre de navigation
+                    updateNotificationBadge();
+
+                    // Mettre à jour le dropdown des notifications s'il est déjà ouvert
+                    updateNotificationDropdown(e);
+                });
+        }
+
+        // Fonction pour mettre à jour le badge de notification
+        function updateNotificationBadge() {
+            const badge = document.querySelector('.notification-bell .notification-badge');
+            const bellIcon = document.querySelector('.notification-bell .notification-icon');
+
+            if (badge) {
+                // Incrémenter le compteur existant
+                let count = parseInt(badge.textContent || '0') + 1;
+                badge.textContent = count;
+                badge.classList.add('pulse'); // Ajouter l'animation
+                badge.style.display = 'flex';
+
+                // Réappliquer l'animation si nécessaire
+                badge.classList.remove('pulse');
+                setTimeout(() => badge.classList.add('pulse'), 10);
+            } else if (bellIcon && bellIcon.parentNode) {
+                // Créer un nouveau badge s'il n'existe pas
+                const newBadge = document.createElement('span');
+                newBadge.className = 'notification-badge pulse';
+                newBadge.textContent = '1';
+                bellIcon.parentNode.appendChild(newBadge);
+            }
+
+            // Ajouter une animation à l'icône de cloche
+            const bell = document.querySelector('.notification-bell');
+            if (bell) {
+                bell.classList.add('has-new');
+                setTimeout(() => bell.classList.remove('has-new'), 1500);
+            }
+        }
+
+        // Fonction pour mettre à jour le contenu du dropdown des notifications
+        function updateNotificationDropdown(notification) {
+            // Vérifier si le dropdown est ouvert
+            const container = document.getElementById('notifDropdownContainer');
+            if (!container || getComputedStyle(container).display === 'none') {
+                // Le dropdown n'est pas ouvert, pas besoin de mettre à jour son contenu
+                return;
+            }
+
+            // À ce stade, nous mettrions à jour le dropdown - cette partie est gérée par notification_dropdown.blade.php
+            // via le script qui écoute également les événements .quiz.notification
+        }
+
+        // Ajouter un gestionnaire d'événements de clic pour les notifications
+        document.addEventListener('DOMContentLoaded', function() {
+            // Attacher le son de clic aux éléments de notification
+            const dropdownContainer = document.getElementById('notifDropdownContainer');
+            if (dropdownContainer) {
+                dropdownContainer.addEventListener('click', function(e) {
+                    if (e.target.closest('.notification-card') || e.target.closest(
+                        '.btn-read-notification')) {
+                        playClickSound();
+                    }
+                });
+            }
+
+            // Notification pour l'utilisateur sur comment tester le son
+            console.log('Double-cliquez sur l\'icône de cloche pour tester le son de notification');
+        });
+    </script>
+
     <script>
         function updateRemainingTime() {
             fetch('/panel/get-user-minutes')
@@ -694,12 +1040,13 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('notifDropdownContainer').innerHTML = data.html;
-    
+
                     const badge = document.querySelector('#notifDropdown .badge');
                     if (data.unreadCount > 0) {
                         if (!badge) {
                             const newBadge = document.createElement('span');
-                            newBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
+                            newBadge.className =
+                                "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
                             newBadge.innerText = data.unreadCount;
                             document.getElementById('notifDropdown').appendChild(newBadge);
                         } else {
@@ -711,11 +1058,11 @@
                 })
                 .catch(error => console.error("Erreur AJAX notifications :", error));
         }
-    
+
         // Rafraîchit toutes les 15 secondes
         setInterval(loadNotifications, 15000);
     </script>
-    
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const input = document.getElementById('childNameInput');
