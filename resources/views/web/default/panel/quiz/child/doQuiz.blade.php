@@ -7,8 +7,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" />
     <style>
-        body {
+        html, body {
             background: linear-gradient(135deg, #cbe4f9, #e0ecf6);
+            height: auto;
+            min-height: 100%;
+            overflow-y: auto;
+            position: relative;
         }
 
         .quiz-container {
@@ -19,6 +23,9 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             padding: 25px;
             transition: all 0.3s ease;
+            margin: 30px 0;
+            max-height: none;
+            overflow: visible;
         }
 
         .quiz-title {
