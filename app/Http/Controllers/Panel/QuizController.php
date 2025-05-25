@@ -494,16 +494,41 @@ class QuizController extends Controller
     }
     public function drafts(Request $request)
     {
+        // Log tous les paramètres de requête pour débogage
+        \Log::info('Paramètres de filtrage reçus:', $request->all());
+        
         $query = Quiz::where('teacher_id', auth()->id())->orderBy('created_by', 'desc');
+        
+        // Filtrer par statut
         if ($request->filled('status')) {
-            $query->where('status', $request->status); // 'draft' ou 'published'
+            $query->where('status', $request->status);
+            \Log::info('Filtrage par statut:', ['status' => $request->status]);
         }
-
+        
+        // Filtrer par niveau
+        if ($request->filled('level')) {
+            $query->whereHas('level', function($q) use ($request) {
+                $q->where('name', $request->level);
+            });
+            \Log::info('Filtrage par niveau:', ['level' => $request->level]);
+        }
+        
+        // Filtrer par matière
+        if ($request->filled('material')) {
+            $query->whereHas('material', function($q) use ($request) {
+                $q->where('name', $request->material);
+            });
+            \Log::info('Filtrage par matière:', ['material' => $request->material]);
+        }
+        
+        // Recherche par titre
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
+            \Log::info('Recherche par titre:', ['search' => $request->search]);
         }
-
-        $quizzes = $query->paginate(9);
+        
+        // Utiliser withQueryString pour préserver les paramètres dans les liens de pagination
+        $quizzes = $query->paginate(9)->withQueryString();
 
         if ($request->ajax()) {
             return view('web.default.panel.quiz.teacher.partials.quizzes', compact('quizzes'))->render();
@@ -533,6 +558,45 @@ class QuizController extends Controller
         $quiz->save();
 
         return response()->json(['success' => true, 'title' => $quiz->title]);
+    }
+    
+    /**
+     * Mettre à jour l'ordre des questions d'un quiz
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateOrder(Request $request)
+    {
+        $request->validate([
+            'quiz_id' => 'required|exists:quiz,id',
+            'question_order' => 'required|array',
+            'question_order.*' => 'required|exists:quiz_questions,id'
+        ]);
+        
+        try {
+            // Récupérer le quiz
+            $quiz = Quiz::findOrFail($request->quiz_id);
+            
+            // Mettre à jour l'ordre de chaque question
+            foreach ($request->question_order as $index => $questionId) {
+                \DB::table('quiz_questions')
+                    ->where('id', $questionId)
+                    ->where('quiz_id', $quiz->id)
+                    ->update(['order' => $index + 1]);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحديث ترتيب الأسئلة بنجاح'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء تحديث ترتيب الأسئلة',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function deleteQuestion($id)
@@ -565,6 +629,35 @@ class QuizController extends Controller
             ]);
 
             $quiz = Quiz::findOrFail($request->quiz_id);
+            $chapter = \App\Models\WebinarChapter::findOrFail($request->chapter_id);
+            $webinar = $chapter->webinar;
+            
+            // Vérification de compatibilité niveau et matière
+            $compatible = true;
+            $message = '';
+            
+            // Vérifier la compatibilité du niveau
+            if (!empty($webinar->level_id) && !empty($quiz->level_id) && $webinar->level_id != $quiz->level_id) {
+                $compatible = false;
+                $webinarLevel = \App\Models\School_level::find($webinar->level_id);
+                $quizLevel = \App\Models\School_level::find($quiz->level_id);
+                $message = 'المستوى غير متطابق: الفصل (' . ($webinarLevel ? $webinarLevel->name : 'غير معروف') . ') والتحدي (' . ($quizLevel ? $quizLevel->name : 'غير معروف') . ')';
+            }
+            
+            // Vérifier la compatibilité de la matière (matiere_id dans Webinar, material_id dans Quiz)
+            if ($compatible && !empty($webinar->matiere_id) && !empty($quiz->material_id) && $webinar->matiere_id != $quiz->material_id) {
+                $compatible = false;
+                $webinarMaterial = \App\Models\Material::find($webinar->matiere_id);
+                $quizMaterial = \App\Models\Material::find($quiz->material_id);
+                $message = 'المادة غير متطابقة: الفصل (' . ($webinarMaterial ? $webinarMaterial->name : 'غير معروف') . ') والتحدي (' . ($quizMaterial ? $quizMaterial->name : 'غير معروف') . ')';
+            }
+            
+            // Si non compatible, retourner une erreur
+            if (!$compatible) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+            
+            // Si compatible, poursuivre l'assignation
             $quiz->model_type = 'App\\Models\\WebinarChapter';
             $quiz->model_id = $request->chapter_id;
             $quiz->status = 'published';

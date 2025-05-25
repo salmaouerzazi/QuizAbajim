@@ -47,10 +47,7 @@
 
 
 
-            {{-- Pagination --}}
-            {{-- <div class="d-flex justify-content-center align-items-center m-auto ">
-                {{ $quizzes->links('vendor.pagination.custom') }}
-            </div> --}}
+            {{-- La pagination est gu00e9ru00e9e dans le fichier partials/quizzes.blade.php --}}
 
             {{-- Floating Button --}}
             <a href="{{ route('panel.teacher.quiz.index') }}" class="btn btn-primary rounded-circle position-fixed"
@@ -69,8 +66,50 @@
 
 
             function loadQuizzes(url = null) {
-                const query = searchInput.value;
-                const fetchUrl = url || `{{ route('panel.quiz.drafts') }}?search=${encodeURIComponent(query)}`;
+                // Récupérer tous les paramètres de filtrage directement des éléments du DOM
+                const searchInput = document.getElementById('searchInput');
+                const statuesFilter = document.getElementById('filterStatues');
+                const levelFilter = document.getElementById('filterLevel');
+                const materialFilter = document.getElementById('filterMaterial');
+                
+                // Si nous utilisons une URL fournie (comme pour la pagination),
+                // il faut extraire les paramètres existants pour les préserver
+                let params;
+                if (url) {
+                    // Analyser l'URL fournie pour extraire les paramètres existants
+                    const urlObj = new URL(url, window.location.origin);
+                    params = new URLSearchParams(urlObj.search);
+                    
+                    // Afficher les paramètres extraits pour débogage
+                    console.log('Paramètres extraits de l\'URL:', Object.fromEntries(params.entries()));
+                } else {
+                    // Construire de nouveaux paramètres bassés sur les filtres actuels
+                    params = new URLSearchParams();
+                    
+                    const query = searchInput ? searchInput.value : '';
+                    const status = statuesFilter ? statuesFilter.value : '';
+                    const level = levelFilter ? levelFilter.value : '';
+                    const material = materialFilter ? materialFilter.value : '';
+                    
+                    // Ajouter les paramètres seulement s'ils ont une valeur
+                    if (query) params.append('search', query);
+                    if (status) params.append('status', status);
+                    if (level) params.append('level', level);
+                    if (material) params.append('material', material);
+                    
+                    // Débogage: afficher les valeurs des filtres dans la console
+                    console.log({
+                        'Recherche': query,
+                        'Statut': status,
+                        'Niveau': level,
+                        'Matière': material
+                    });
+                }
+                
+                // Construire l'URL finale
+                const fetchUrl = url || `{{ route('panel.quiz.drafts') }}?${params.toString()}`;
+                
+                console.log('URL de chargement finale:', fetchUrl); // Aide au débogage
 
                 fetch(fetchUrl, {
                         headers: {
@@ -80,23 +119,24 @@
                     .then(res => res.text())
                     .then(html => {
                         document.getElementById('quizWrapper').innerHTML = html;
-
+                        // Attacher les écouteurs de pagination après avoir chargé le nouveau contenu
                         attachPaginationLinks();
-                        applyFilters();
                     })
                     .catch(err => console.error("Erreur AJAX :", err));
             }
 
-            // Recherche instantanée
-            searchInput.addEventListener('input', function() {
-                loadQuizzes(); // recharge les quiz avec le texte de recherche
-            });
+            // La recherche instantanée est gérée dans la fonction setupEventListeners
 
-            //  Fonction pour intercepter les clics pagination
+            //  Fonction pour intercepter les clics pagination - version améliorée sans duplication d'écouteurs
             function attachPaginationLinks() {
                 const links = quizWrapper.querySelectorAll('.pagination a');
                 links.forEach(link => {
-                    link.addEventListener('click', function(e) {
+                    // Supprimer les écouteurs précédents en clonant et remplaçant l'élément
+                    const newLink = link.cloneNode(true);
+                    link.parentNode.replaceChild(newLink, link);
+                    
+                    // Ajouter le nouvel écouteur
+                    newLink.addEventListener('click', function(e) {
                         e.preventDefault();
                         const url = this.getAttribute('href');
                         if (url) {
@@ -105,9 +145,11 @@
                     });
                 });
             }
-
+            
             // Initialiser au chargement
-            attachPaginationLinks();
+            document.addEventListener('DOMContentLoaded', function() {
+                attachPaginationLinks();
+            });
         </script>
 
 
@@ -308,37 +350,44 @@
                 }
             }
 
-            //  Client-side filtering
-            const levelFilter = document.getElementById('filterLevel');
-            const materialFilter = document.getElementById('filterMaterial');
-            const cards = document.querySelectorAll('.quiz-card-wrapper');
-
-            function applyFilters() {
-                const selectedLevel = levelFilter.value;
-                const selectedMaterial = materialFilter.value;
-                const selectedStatues = statuesFilter.value;
-                const query = searchInput.value.trim().toLowerCase();
-
-                cards.forEach(card => {
-                    const level = card.getAttribute('data-level') || '';
-                    const material = card.getAttribute('data-material') || '';
-                    const statues = card.getAttribute('data-statues') || '';
-                    const title = card.querySelector('.quiz-title')?.textContent?.toLowerCase() || '';
-
-                    const match =
-                        (!selectedLevel || level === selectedLevel) &&
-                        (!selectedMaterial || material === selectedMaterial) &&
-                        (!selectedStatues || statues === selectedStatues) &&
-                        (!query || title.includes(query));
-
-                    card.style.display = match ? '' : 'none';
-                });
+            // Fonction pour attacher les écouteurs d'événements sans conflit
+            function setupEventListeners() {
+                // Au lieu de cloner et remplacer, nous allons simplement attacher les écouteurs directement
+                // mais en nous assurant d'utiliser la même fonction de callback pour tous
+                
+                const levelFilter = document.getElementById('filterLevel');
+                const materialFilter = document.getElementById('filterMaterial');
+                const statuesFilter = document.getElementById('filterStatues');
+                const searchInput = document.getElementById('searchInput');
+                
+                // Vérifier que tous les éléments existent avant d'attacher les écouteurs
+                if (levelFilter) {
+                    levelFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (materialFilter) {
+                    materialFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (statuesFilter) {
+                    statuesFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (searchInput) {
+                    searchInput.addEventListener('input', triggerLoadQuizzes);
+                }
             }
-
-
-            levelFilter.addEventListener('change', applyFilters);
-            materialFilter.addEventListener('change', applyFilters);
-            statuesFilter.addEventListener('change', applyFilters);
+            
+            // Fonction de callback commune pour tous les écouteurs pour éviter les conflits
+            function triggerLoadQuizzes() {
+                loadQuizzes();
+            }
+            
+            // Configurer les écouteurs au chargement initial de la page
+            document.addEventListener('DOMContentLoaded', function() {
+                setupEventListeners();
+                attachPaginationLinks();
+            });
         </script>
         @if(session('success'))
     <script>

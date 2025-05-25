@@ -74,7 +74,7 @@
     @endforelse
 
     <div class="col-12 d-flex justify-content-center mt-4">
-        {{ $quizzes->appends(request()->only('search'))->links('vendor.pagination.custom') }}
+        {{ $quizzes->appends(request()->all())->links('vendor.pagination.custom') }}
     </div>
 </div>
 @push('scripts_bottom')

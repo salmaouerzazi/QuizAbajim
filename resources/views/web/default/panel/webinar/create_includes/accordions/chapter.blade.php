@@ -172,11 +172,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
                 </div>
                 <div class="modal-body">
-                    <select id="quizSelect{{ $chapter->id }}" class="form-control" required>
-                        @foreach ($quizzes as $quiz)
-                            <option value="{{ $quiz->id }}">{{ $quiz->title }}</option>
-                        @endforeach
+                    <div id="quizSelectLoading{{ $chapter->id }}" class="text-center">
+                        <i class="fa fa-spinner fa-spin"></i> جاري تحميل التحديات المتاحة...
+                    </div>
+                    <select id="quizSelect{{ $chapter->id }}" class="form-control" required style="display:none;">
+                        <option value="">{{ trans('public.no_available_quizzes') }}</option>
                     </select>
+
                 </div>
                 <div class="modal-footer">
                     <button onclick="assignQuiz({{ $chapter->id }})" class="btn btn-success" type="button">
@@ -207,8 +209,82 @@
         });
     </script>
     <script>
+        // Ajouter des écouteurs d'événements pour l'ouverture des modaux de quiz
+        document.addEventListener('DOMContentLoaded', function() {
+            // Trouver tous les boutons qui ouvrent les modaux de quiz
+            document.querySelectorAll('[data-bs-toggle="modal"]').forEach(function(button) {
+                const modalId = button.getAttribute('data-bs-target');
+                if (modalId && modalId.includes('assignQuizModal')) {
+                    button.addEventListener('click', function() {
+                        const chapterId = modalId.replace('#assignQuizModal', '');
+                        loadFilteredQuizzes(chapterId);
+                    });
+                }
+            });
+        });
+        
+        // Fonction pour charger les quiz filtrés par niveau et matière
+        function loadFilteredQuizzes(chapterId) {
+            const loadingElement = document.getElementById('quizSelectLoading' + chapterId);
+            const selectElement = document.getElementById('quizSelect' + chapterId);
+            
+            // Afficher le chargement, masquer le select
+            loadingElement.style.display = 'block';
+            selectElement.style.display = 'none';
+            
+            // Vider le select
+            selectElement.innerHTML = '<option value="">{{ trans("public.no_available_quizzes") }}</option>';
+            
+            // Charger les quiz filtrés via notre nouvelle route dédiée
+            fetch(`{{ route('panel.quiz.filtered', '') }}/${chapterId}`, {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error("Request failed");
+                    return response.json();
+                })
+                .then(data => {
+                    // Masquer le chargement, afficher le select
+                    loadingElement.style.display = 'none';
+                    selectElement.style.display = 'block';
+                    
+                    // Si des quiz sont disponibles, les ajouter au select
+                    if (data.quizzes && data.quizzes.length > 0) {
+                        data.quizzes.forEach(quiz => {
+                            const option = document.createElement('option');
+                            option.value = quiz.id;
+                            option.textContent = quiz.title;
+                            selectElement.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading quizzes:", error);
+                    loadingElement.style.display = 'none';
+                    selectElement.style.display = 'block';
+                    Swal.fire({
+                        icon: "error",
+                        title: "خطأ في تحميل التحديات",
+                        text: error.message
+                    });
+                });
+        }
+        
         function assignQuiz(chapterId) {
             const quizId = document.getElementById('quizSelect' + chapterId).value;
+            
+            if (!quizId) {
+                Swal.fire({
+                    icon: "error",
+                    title: "يرجى اختيار تحدي",
+                    text: "لم يتم اختيار أي تحدي للربط"
+                });
+                return;
+            }
 
             fetch("{{ route('panel.quiz.assignToChapter') }}", {
                     method: "POST",
@@ -222,7 +298,11 @@
                     })
                 })
                 .then(response => {
-                    if (!response.ok) throw new Error("Request failed");
+                    if (!response.ok) {
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.message || "Request failed");
+                        });
+                    }
                     return response.json();
                 })
                 .then(data => {
@@ -237,7 +317,11 @@
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    Swal.fire(error.message, "", "error");
+                    Swal.fire({
+                        icon: "error",
+                        title: "خطأ في ربط التحدي",
+                        text: error.message
+                    });
                 });
         }
     </script>
