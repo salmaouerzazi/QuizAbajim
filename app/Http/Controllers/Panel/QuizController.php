@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Storage;
 use App\UserMatiere;
 use App\Models\School_level;
 use App\Models\Material;
+use App\Models\QuizSubmissions;
+use App\Models\QuizAttemptScore;
+
+use App\Models\User;
 
 class QuizController extends Controller
 {
@@ -68,6 +72,8 @@ class QuizController extends Controller
         $quiz->material_id = $request->input('subject');
         $quiz->question_count = $request->input('num_questions', 5);
         $quiz->pdf_path = $path;
+        $quiz->title = $request->input('title', 'تحدي بدون عنوان');
+        $quiz->status = 'draft';
         $quiz->teacher_id = auth()->id();
         $quiz->text_content = $textContent; // texte extrait du PDF
         $quiz->created_by = (int) now()->timestamp;
@@ -195,6 +201,16 @@ class QuizController extends Controller
         }
 
         DB::commit();
+        $quiz->load(['teacher', 'material']);
+        $children = User::where('role', 'child')
+            ->where('level_id', $quiz->level_id)
+            ->where('material_id', $quiz->material_id) // ou utiliser une relation si besoin
+            ->get();
+
+        // Envoyer la notification
+        foreach ($children as $child) {
+            $child->notify(new \App\Notifications\NewQuizNotification($quiz));
+        }
 
         return redirect()->route('panel.quiz.edit', ['id' => $quiz->id]);
         // } catch (\Exception $e) {
@@ -255,7 +271,6 @@ class QuizController extends Controller
 
         return null;
     }
-  
 
     /**
      * Afficher la page d'édition des questions générées.
@@ -354,14 +369,14 @@ class QuizController extends Controller
             $colA_raw = trim($matches[1]);
             $colB_raw = trim($matches[2]);
 
-            // ✅ Extraire les éléments de la colonne A
+            //  Extraire les éléments de la colonne A
             $colA = [];
             if (preg_match_all('/\d+\)\s*(.+)/u', $colA_raw, $matchesA, PREG_SET_ORDER)) {
                 foreach ($matchesA as $match) {
                     $colA[] = trim($match[1]);
                 }
             }
-            // ✅ Extraire les éléments de la colonne B avec leurs lettres
+            //  Extraire les éléments de la colonne B avec leurs lettres
             $colB_map = [];
             if (preg_match_all('/([أ-ي])\)\s*(.+)/u', $colB_raw, $matchesB, PREG_SET_ORDER)) {
                 foreach ($matchesB as $match) {
@@ -371,11 +386,11 @@ class QuizController extends Controller
                 }
             }
 
-            // ✅ Nettoyer les flèches et parser les correspondances
+            //  Nettoyer les flèches et parser les correspondances
             $mapping_raw = str_replace(['→', '➡️', '⇒', '=>', '⟶'], '->', trim($matches[3]));
             $mappings = array_filter(array_map('trim', explode("\n", $mapping_raw)));
 
-            // ✅ Construire les réponses à partir des correspondances
+            //  Construire les réponses à partir des correspondances
             foreach ($mappings as $line) {
                 if (preg_match('/(\d+)\s*->\s*([أ-ي])/u', $line, $link)) {
                     $indexA = (int) $link[1] - 1;
@@ -458,7 +473,7 @@ class QuizController extends Controller
                         $answerText = trim($a['answer_text'] ?? '');
                         if ($answerText === '') {
                             continue;
-                        } // 🛡️ Empêche les réponses vides
+                        } //  Empêche les réponses vides
 
                         Answer::create([
                             'question_id' => $question->id,
@@ -572,5 +587,96 @@ class QuizController extends Controller
         $quiz->save();
 
         return back()->with('success', 'تم إلغاء ربط التحدي بنجاح.');
+    }
+    public function showForChild($id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($id);
+
+        // Si le quiz est lié à un chapitre
+        $chapter = \App\Models\WebinarChapter::where('id', $quiz->model_id)->first();
+        $course = $chapter ? $chapter->webinar : null;
+
+        return view('web.default.panel.quiz.child.doQuiz', compact('quiz', 'course'));
+    }
+    public function submitFromChild(Request $request, $id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($id);
+        $childId = auth()->id();
+        $answers = $request->input('answers', []);
+
+        $lastAttempt = QuizAttemptScore::where('quiz_id', $quiz->id)->where('child_id', $childId)->orderByDesc('attempt_number')->first();
+
+        $attemptNumber = $lastAttempt ? $lastAttempt->attempt_number + 1 : 1;
+
+        $totalScore = $quiz->questions->sum('score');
+
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'attempt_number' => $attemptNumber,
+            'score' => 0, // temporaire
+            'score_total' => $totalScore,
+            'submitted_at' => now(),
+        ]);
+
+        $score = 0;
+
+        foreach ($quiz->questions as $question) {
+            $userAnswer = $answers[$question->id] ?? null;
+            $isValid = false;
+
+            if ($question->type === 'binaire') {
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isValid = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => true,
+                ]);
+            } elseif ($question->type === 'qcm') {
+                $expectedId = $question->answers->where('is_valid', true)->first()?->id;
+                $isValid = $userAnswer == $expectedId;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'answer_id' => $userAnswer,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
+            } elseif ($question->type === 'arrow') {
+                $expectedMap = $question->answers->mapWithKeys(fn($a) => [$a->answer_text => $a->matching])->toArray();
+                $userMap = is_string($userAnswer) ? json_decode($userAnswer, true) : $userAnswer ?? [];
+                $isValid = $userMap == $expectedMap;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'arrow_mapping' => json_encode($userMap),
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
+            }
+
+            if ($isValid) {
+                $score += $question->score;
+            }
+        }
+
+        $attempt->update(['score' => $score]);
+
+        return view('web.default.panel.quiz.child.result', [
+            'quiz' => $quiz,
+            'attempt' => $attempt,
+            'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
+        ]);
     }
 }

@@ -36,7 +36,6 @@ use App\Models\School_level;
 use App\Models\Material;
 use App\Models\Manuels;
 use App\Models\Option;
-use App\Models\QuizzesResult;
 class WebinarController extends Controller
 {
     public $tableName = 'webinars';
@@ -131,10 +130,6 @@ class WebinarController extends Controller
                     }
                 }
             }
-
-            if (!empty($course->quizzes) and count($course->quizzes)) {
-                $course->quizzes = $this->checkQuizzesResults($user, $course->quizzes);
-            }
         }
 
         $pageRobot = getPageRobot('course_show');
@@ -157,51 +152,7 @@ class WebinarController extends Controller
 
         return view('web.default.panel.webinar.includes_courses.index', $data);
     }
-    private function checkQuizzesResults($user, $quizzes)
-    {
-        $canDownloadCertificate = false;
 
-        foreach ($quizzes as $quiz) {
-            $quiz = $this->checkQuizResults($user, $quiz);
-        }
-
-        return $quizzes;
-    }
-    private function checkQuizResults($user, $quiz)
-    {
-        $canDownloadCertificate = false;
-
-        $canTryAgainQuiz = false;
-        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)->where('user_id', $user->id)->orderBy('created_at', 'desc')->get();
-
-        if (count($userQuizDone)) {
-            $quiz->user_grade = $userQuizDone->first()->user_grade;
-            $quiz->result_count = $userQuizDone->count();
-            $quiz->result = $userQuizDone->first();
-
-            $status_pass = false;
-            foreach ($userQuizDone as $result) {
-                if ($result->status == QuizzesResult::$passed) {
-                    $status_pass = true;
-                }
-            }
-
-            $quiz->result_status = $status_pass ? QuizzesResult::$passed : $userQuizDone->first()->status;
-
-            if ($quiz->certificate and $quiz->result_status == QuizzesResult::$passed) {
-                $canDownloadCertificate = true;
-            }
-        }
-
-        if (!isset($quiz->attempt) or count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed) {
-            $canTryAgainQuiz = true;
-        }
-
-        $quiz->can_try = $canTryAgainQuiz;
-        $quiz->can_download_certificate = $canDownloadCertificate;
-
-        return $quiz;
-    }
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -1015,17 +966,6 @@ class WebinarController extends Controller
                     $query->where('subscribe', 1);
                 }
 
-                if (in_array('certificate_included', $moreOptions)) {
-                    $query->whereHas('quizzes', function ($query) {
-                        $query->where('certificate', 1)->where('status', 'active');
-                    });
-                }
-
-                if (in_array('with_quiz', $moreOptions)) {
-                    $query->whereHas('quizzes', function ($query) {
-                        $query->where('status', 'active');
-                    });
-                }
 
                 if (in_array('featured', $moreOptions)) {
                     $query->whereHas('feature', function ($query) {

@@ -5,6 +5,8 @@ use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Controllers\Panel\CardReservationController;
+use App\Http\Controllers\Panel\QuizController;
+use App\Http\Controllers\QuizNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,26 +18,30 @@ use App\Http\Controllers\Panel\CardReservationController;
 | contains the "web" middleware group. Now create something great!
 |
 */
+Route::get('/course/quizzes/do/{id}', [QuizController::class, 'showForChild'])->name('panel.quiz.do');
+
 Route::post('/clear-session', function () {
     Session::forget('teacher_id');
     return response()->json(['success' => 'Session variable cleared']);
 })->name('clear-session');
-Route::get('/test-session', function() {
+Route::get('/test-session', function () {
     $teacherId = session('teacher_id');
-    return $teacherId ? "Teacher ID exists: $teacherId" : "Teacher ID is cleared";
+    return $teacherId ? "Teacher ID exists: $teacherId" : 'Teacher ID is cleared';
 });
 
-Route::post('/insert-icon',  'PdfInsertController@insertIcon');
+Route::post('/insert-icon', 'PdfInsertController@insertIcon');
 Route::get('/exp', function () {
     return view('insert');
 });
-Route::get('/mobile-app', 'Web\MobileAppController@index')->middleware(['share'])->name('mobileAppRoute');
+Route::get('/mobile-app', 'Web\MobileAppController@index')
+    ->middleware(['share'])
+    ->name('mobileAppRoute');
 
 Route::get('/')->middleware(RedirectIfAuthenticated::class);
-Route::get('/get-manuel-documents/{id}', [HomeController::class,'getManualDocuments']);
+Route::get('/get-manuel-documents/{id}', [HomeController::class, 'getManualDocuments']);
 
-Route::get('/card_reservations', [HomeController::class,'createcard'])->name('webcard_reservations.index');
-Route::post('/card_reservations/store', [HomeController::class,'storecard'])->name('webcard_reservations.store');
+Route::get('/card_reservations', [HomeController::class, 'createcard'])->name('webcard_reservations.index');
+Route::post('/card_reservations/store', [HomeController::class, 'storecard'])->name('webcard_reservations.store');
 
 Route::group(['namespace' => 'Auth', 'middleware' => ['check_mobile_app', 'share']], function () {
     Route::get('/step2', [UserController::class, 'step2']);
@@ -48,26 +54,26 @@ Route::group(['namespace' => 'Auth', 'middleware' => ['check_mobile_app', 'share
     Route::get('/logout', 'LoginController@logout');
     Route::get('/register', 'RegisterController@showRegistrationForm');
     Route::post('/register', 'RegisterController@register');
-    
+
     Route::get('/Instructor/register', 'RegisterController@showRegistrationInstructorForm');
     Route::post('/Instructor/register', 'RegisterController@registerInstructor');
-    
+
     Route::get('/verification', 'VerificationController@index');
     Route::get('/Instructor/verification', 'VerificationController@indexInstructor');
-    
+
     Route::post('/verification', 'VerificationController@confirmCode');
     Route::post('/Instructor/verification', 'VerificationController@confirmCodeInstructor');
-    
+
     Route::get('/verification/resend', 'VerificationController@resendCode');
     Route::get('/Instructor/verification/resend', 'VerificationController@resendCodeInstructor');
-    
+
     Route::get('/forget-password', 'ForgotPasswordController@showLinkRequestForm');
     Route::post('/send-email', 'ForgotPasswordController@forgot');
     Route::get('reset-password/{token}', 'ResetPasswordController@showResetForm');
     Route::post('/reset-password', 'ResetPasswordController@updatePassword');
     Route::get('/google', 'SocialiteController@redirectToGoogle');
     Route::get('/google/callback', 'SocialiteController@handleGoogleCallback');
-    
+
     Route::get('/facebook/redirect', 'SocialiteController@redirectToFacebook');
     Route::get('/facebook/callback', 'SocialiteController@handleFacebookCallback');
     Route::get('/reff/{code}', 'ReferralController@referral');
@@ -80,9 +86,8 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
 
     // set Locale
     Route::post('/locale', 'LocaleController@setLocale');
-    
+
     Route::get('/', 'HomeController@index')->middleware(RedirectIfAuthenticated::class);
-   
 
     Route::get('/getDefaultAvatar', 'DefaultAvatarController@make');
 
@@ -133,7 +138,6 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
         Route::post('/validate', 'CertificateValidationController@checkValidate');
     });
 
-
     Route::group(['prefix' => 'cart'], function () {
         Route::post('/store', 'CartManagerController@store');
         Route::get('/{id}/delete', 'CartManagerController@destroy');
@@ -167,7 +171,6 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
             Route::post('/', 'BecomeInstructorController@store');
             Route::post('/setting', 'BecomeInstructorController@storeSetting');
         });
-
     });
 
     Route::group(['prefix' => 'meetings'], function () {
@@ -176,8 +179,13 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
 
     Route::group(['prefix' => 'manuels'], function () {
         Route::get('/', 'UserController@manuels')->name('manuels');
-
     });
+
+    Route::get('/enfant/notifications', [QuizNotificationController::class, 'listForChild'])->name('child.notifications.index');
+
+    Route::post('/enfant/notifications/read/{id}', [QuizNotificationController::class, 'markAsRead'])->name('child.notifications.read');
+    Route::get('/child/notifications/ajax', [QuizNotificationController::class, 'ajaxNotifications'])->name('child.notifications.ajax');
+
 
     Route::group(['prefix' => 'users'], function () {
         Route::get('/{id}/profile', 'UserController@profile');
@@ -195,17 +203,15 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
         Route::get('/', 'SearchController@index');
     });
 
-
     Route::group(['prefix' => 'contact'], function () {
         Route::get('/', 'ContactController@index');
         Route::post('/store', 'ContactController@store');
     });
 
-        Route::group(['prefix' => 'instructors'], function () {
+    Route::group(['prefix' => 'instructors'], function () {
         Route::get('/', 'UserController@instructors');
         Route::get('/get-materials-by-level', [UserController::class, 'getMaterialsByLevel']);
         Route::get('/search', [UserController::class, 'searchInstructors']);
-
     });
 
     Route::group(['prefix' => 'load_more'], function () {
@@ -243,7 +249,6 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
         Route::get('/wizard', 'InstructorFinderController@wizard');
     });
 
-
     Route::group(['prefix' => 'forums'], function () {
         Route::get('/', 'ForumController@index');
         Route::get('/create-topic', 'ForumController@createTopic');
@@ -277,4 +282,3 @@ Route::group(['namespace' => 'Web', 'middleware' => ['check_mobile_app', 'impers
         Route::post('/customize', 'CookieSecurityController@setCustomize');
     });
 });
-

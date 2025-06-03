@@ -9,6 +9,7 @@ trait LearningPageMixinsTrait
 {
     public function getCourse($slug, $user = null, $relation = null, $relationWith = null)
     {
+ 
         if (empty($user)) {
             $user = auth()->user();
         }

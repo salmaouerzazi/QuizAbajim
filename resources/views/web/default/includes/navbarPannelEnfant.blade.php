@@ -183,6 +183,35 @@
                 }
             @endphp
 
+            @php
+                use App\QuizNotificationUsers;
+
+                $notifications = QuizNotificationUsers::with('notification')
+                    ->where('receiver_id', $authUser->id)
+                    ->orderByDesc('created_at')
+                    ->take(5)
+                    ->get();
+
+                $unreadCount = $notifications->where('is_read', false)->count();
+            @endphp
+            <div class="dropdown me-3">
+                <a class="nav-link dropdown-toggle position-relative" href="#" role="button"
+                   id="notifDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                   style="font-size: 20px; color: #333;">
+                    <i class="fas fa-bell"></i>
+                    @if($unreadCount > 0)
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            {{ $unreadCount }}
+                        </span>
+                    @endif
+                </a>
+            
+                <div id="notifDropdownContainer" class="dropdown-menu dropdown-menu-right shadow-sm p-2" aria-labelledby="notifDropdown" style="min-width: 300px; max-height: 300px; overflow-y: auto;">
+                    @include('web.default.includes.notification_dropdown')
+                </div>
+            </div>
+            </div>
+            
 
             <ul class="avatars">
                 @if (!empty($enfant))
@@ -211,6 +240,7 @@
 
             </ul>
 
+
             <div class="nav-icons-or-start-live navbar-order">
                 @if (empty($authUser))
                     <a href="{{ empty($authUser) ? '/Instructor/register' : ($authUser->isAdmin() ? '/admin/webinars/create' : ($authUser->isVisiteur() ? '/become_instructor' : '/panel/webinars/new')) }}"
@@ -225,7 +255,8 @@
                         $idOrgan = DB::table('users')->where('id', $authUser->id)->pluck('organ_id');
                         ?>
                         <a href="#" class="navbar-user d-flex align-items-center ml-25" type="button"
-                            id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true"
+                            aria-expanded="false">
                             @if (!empty($userparent[0]->avatar))
                                 <img src="{{ $userparent[0]->getAvatar(100) }}" class="rounded-circle desktop-avatar"
                                     alt="{{ $userparent[0]->full_name }}">
@@ -456,7 +487,9 @@
         }
 
     }
+
 </style>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
     aria-hidden="true">
@@ -655,6 +688,34 @@
 
         // });
     </script>
+    <script>
+        function loadNotifications() {
+            fetch("{{ route('child.notifications.ajax') }}")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('notifDropdownContainer').innerHTML = data.html;
+    
+                    const badge = document.querySelector('#notifDropdown .badge');
+                    if (data.unreadCount > 0) {
+                        if (!badge) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
+                            newBadge.innerText = data.unreadCount;
+                            document.getElementById('notifDropdown').appendChild(newBadge);
+                        } else {
+                            badge.innerText = data.unreadCount;
+                        }
+                    } else if (badge) {
+                        badge.remove();
+                    }
+                })
+                .catch(error => console.error("Erreur AJAX notifications :", error));
+        }
+    
+        // Rafraîchit toutes les 15 secondes
+        setInterval(loadNotifications, 15000);
+    </script>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const input = document.getElementById('childNameInput');
