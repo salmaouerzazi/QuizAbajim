@@ -27,7 +27,9 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
     Route::group(['middleware' => ['checkrole:enfant']], function () {
         Route::get('/enfant/concours', [ConcoursController::class, 'getConcoursByLevelEnfant']);
         Route::get('/enfant/concours/{id}', [ConcoursController::class, 'getConcoursBookAndInsertIconPlay']);
-        Route::post('/quizzes/submit/{id}', 'QuizController@submitFromChild')->name('panel.quiz.submit');
+        Route::post('/quizzes/{id}/submit-child', 'QuizController@submitFromChild')->name('panel.quiz.submit');
+        Route::get('/child/quiz/{quiz_id}/last-attempt', 'QuizController@getLastAttemptResult')->name('quiz.lastAttempt');
+
 
         //-------------------------------------------------------------------------
 

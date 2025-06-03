@@ -24,10 +24,13 @@ trait LearningPageItemInfoTrait
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'code' => 422,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(
+                [
+                    'code' => 422,
+                    'errors' => $validator->errors(),
+                ],
+                422,
+            );
         }
 
         $type = $data['type'];
@@ -51,21 +54,17 @@ trait LearningPageItemInfoTrait
 
         $course = Webinar::find($courseId);
 
-        return (!empty($course));
+        return !empty($course);
     }
 
     private function getFileInfo($id)
     {
-        $file = File::select('id', 'downloadable', 'webinar_id', 'chapter_id', 'storage', 'online_viewer', 'file')
-            ->where('id', $id)
-            ->where('status', WebinarChapter::$chapterActive)
-            ->first();
+        $file = File::select('id', 'downloadable', 'webinar_id', 'chapter_id', 'storage', 'online_viewer', 'file')->where('id', $id)->where('status', WebinarChapter::$chapterActive)->first();
 
         $checkSequenceContent = !empty($file) ? $file->checkSequenceContent() : null;
         $sequenceContentHasError = (!empty($checkSequenceContent) and (!empty($checkSequenceContent['all_passed_items_error']) or !empty($checkSequenceContent['access_after_day_error'])));
 
         if (!empty($file) and ($file->accessibility == 'free' or $this->checkCourseAccess($file->webinar_id)) and !$sequenceContentHasError) {
-
             $filePath = url($file->file);
 
             if (in_array($file->storage, ['s3', 'external_link'])) {
@@ -81,9 +80,8 @@ trait LearningPageItemInfoTrait
                     'downloadable' => $file->downloadable ?? false,
                     'online_viewer' => $file->online_viewer ?? false,
                     'file_path' => $file->online_viewer ? $filePath : false,
-                ]
+                ],
             ];
-           
 
             return response()->json($data);
         }
@@ -93,15 +91,12 @@ trait LearningPageItemInfoTrait
 
     private function getSessionInfo($id)
     {
-        $session = Session::where('id', $id)
-            ->where('status', WebinarChapter::$chapterActive)
-            ->first();
+        $session = Session::where('id', $id)->where('status', WebinarChapter::$chapterActive)->first();
 
         $checkSequenceContent = !empty($session) ? $session->checkSequenceContent() : null;
         $sequenceContentHasError = (!empty($checkSequenceContent) and (!empty($checkSequenceContent['all_passed_items_error']) or !empty($checkSequenceContent['access_after_day_error'])));
 
         if (!empty($session) and $this->checkCourseAccess($session->webinar_id) and !$sequenceContentHasError) {
-
             $isFinished = $session->isFinished();
             // for translate send on array of data
             $data = [
@@ -109,10 +104,10 @@ trait LearningPageItemInfoTrait
                     'id' => $session->id,
                     'title' => $session->title,
                     'is_finished' => $isFinished,
-                    'is_started' => (time() > $session->date),
+                    'is_started' => time() > $session->date,
                     'join_url' => !$isFinished ? $session->getJoinLink(true) : null,
-                    'start_data' => dateTimeFormat($session->date, 'j M Y H:i')
-                ]
+                    'start_data' => dateTimeFormat($session->date, 'j M Y H:i'),
+                ],
             ];
 
             return response()->json($data);
@@ -125,10 +120,7 @@ trait LearningPageItemInfoTrait
     {
         $user = auth()->user();
 
-        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)
-            ->where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $userQuizDone = QuizzesResult::where('quiz_id', $quiz->id)->where('user_id', $user->id)->orderBy('created_at', 'desc')->get();
 
         $canDownloadCertificate = false;
         $canTryAgainQuiz = false;
@@ -152,7 +144,7 @@ trait LearningPageItemInfoTrait
             }
         }
 
-        if (!isset($quiz->attempt) or (count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed)) {
+        if (!isset($quiz->attempt) or count($userQuizDone) < $quiz->attempt and $quiz->result_status !== QuizzesResult::$passed) {
             $canTryAgainQuiz = true;
         }
 
@@ -162,28 +154,59 @@ trait LearningPageItemInfoTrait
         return $quiz;
     }
 
+    // private function getQuizInfo($id)
+    // {
+    //     $quiz = Quiz::where('id', $id)
+    //         ->where('status', WebinarChapter::$chapterActive)
+    //         ->first();
+
+    //     if (!empty($quiz) and $this->checkCourseAccess($quiz->webinar_id)) {
+    //         $quiz = $this->checkQuizResult($quiz);
+
+    //         // for translate send on array of data
+    //         $data = [
+    //             'quiz' => [
+    //                 'id' => $quiz->id,
+    //                 'title' => $quiz->title,
+    //                 'can_try' => $quiz->can_try,
+    //             ]
+    //         ];
+
+    //         return response()->json($data);
+    //     }
+
+    //     abort(403);
+    // }
     private function getQuizInfo($id)
     {
-        $quiz = Quiz::where('id', $id)
-            ->where('status', WebinarChapter::$chapterActive)
-            ->first();
+        $user = auth()->user();
 
-        if (!empty($quiz) and $this->checkCourseAccess($quiz->webinar_id)) {
-            $quiz = $this->checkQuizResult($quiz);
+        $quiz = Quiz::where('id', $id)->where('status', 'published')->first();
 
-            // for translate send on array of data
-            $data = [
-                'quiz' => [
-                    'id' => $quiz->id,
-                    'title' => $quiz->title,
-                    'can_try' => $quiz->can_try,
-                ]
-            ];
-
-            return response()->json($data);
+        if (!$quiz) {
+            //---> Quiz doesn't exist or is inactive
+            return response()->json(
+                [
+                    'error' => 'Quiz not found or inactive.',
+                ],
+                404,
+            );
         }
 
-        abort(403);
+        //----> Check user quiz result status
+        $quiz = $this->checkQuizResult($quiz);
+
+        return response()->json([
+            'quiz' => [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'can_try' => $quiz->can_try,
+                'can_download_certificate' => $quiz->can_download_certificate ?? false,
+                'user_grade' => $quiz->user_grade ?? null,
+                'result_status' => $quiz->result_status ?? null,
+                'result_count' => $quiz->result_count ?? 0,
+            ],
+        ]);
     }
 
     private function getTextLessonInfo($id)
@@ -198,7 +221,7 @@ trait LearningPageItemInfoTrait
                 },
                 'learningStatus' => function ($query) use ($user) {
                     $query->where('user_id', !empty($user) ? $user->id : null);
-                }
+                },
             ])
             ->first();
 
@@ -206,7 +229,6 @@ trait LearningPageItemInfoTrait
         $sequenceContentHasError = (!empty($checkSequenceContent) and (!empty($checkSequenceContent['all_passed_items_error']) or !empty($checkSequenceContent['access_after_day_error'])));
 
         if (!empty($textLesson) and ($textLesson->accessibility == 'free' or $this->checkCourseAccess($textLesson->webinar_id)) and !$sequenceContentHasError) {
-
             $attachments = [];
 
             if (!empty($textLesson->attachments) and count($textLesson->attachments)) {
@@ -219,7 +241,7 @@ trait LearningPageItemInfoTrait
                                 'title' => $attachment->file->title,
                                 'file_type' => $attachment->file->file_type,
                                 'volume' => $attachment->file->volume,
-                            ]
+                            ],
                         ];
                     }
                 }
@@ -236,7 +258,7 @@ trait LearningPageItemInfoTrait
                     'content' => $textLesson->content,
                     'attachments' => $attachments,
                     'learningStatus' => $textLesson->learningStatus,
-                ]
+                ],
             ];
 
             return response()->json($data);

@@ -142,7 +142,14 @@
             } else if (itemType === 'text_lesson') {
                 handleTextLessonHtml(result.textLesson);
             } else if (itemType === 'quiz') {
-                handleQuizHtml(result.quiz);
+                // handleQuizHtml(result.quiz);
+                addContentLoading();
+                $.get(`/course/quizzes/do/${itemId}`, function (html) {
+                    $('#learningPageContent').html(html);
+                }).fail(function () {
+                    $('#learningPageContent').html('<div class="alert alert-danger p-15">Failed to load quiz content.</div>');
+                });
+                return;  
             }
         });
     }
@@ -171,28 +178,39 @@
         learningPageContent.html(html);
     }
 
+    // function handleQuizHtml(quiz) {
+
+    //     const title = quiz.title;
+    //     const hint = goToTheQuizPageForMoreInformationLang;
+    //     const img = 'quiz.svg';
+
+    //     let otherHtml = '';
+
+    //     if (quiz.can_try) {
+    //         otherHtml = `
+    //             <a href="/panel/quizzes/${quiz.id}/start" target="_blank" class="btn btn-primary btn-sm mt-15">${quizPageLang}</a>
+    //         `;
+    //     } else {
+    //         otherHtml = `
+    //             <button type="button" class="js-cant-start-quiz-toast btn btn-primary btn-sm mt-15 disabled">${quizPageLang}</button>
+    //         `;
+    //     }
+
+    //     const html = handleContentBoxHtml(title, hint, img, otherHtml);
+
+    //     learningPageContent.html(html);
+    // }
     function handleQuizHtml(quiz) {
+        addContentLoading();
 
-        const title = quiz.title;
-        const hint = goToTheQuizPageForMoreInformationLang;
-        const img = 'quiz.svg';
-
-        let otherHtml = '';
-
-        if (quiz.can_try) {
-            otherHtml = `
-                <a href="/panel/quizzes/${quiz.id}/start" target="_blank" class="btn btn-primary btn-sm mt-15">${quizPageLang}</a>
-            `;
-        } else {
-            otherHtml = `
-                <button type="button" class="js-cant-start-quiz-toast btn btn-primary btn-sm mt-15 disabled">${quizPageLang}</button>
-            `;
-        }
-
-        const html = handleContentBoxHtml(title, hint, img, otherHtml);
-
-        learningPageContent.html(html);
+        $.get(`/course/quizzes/do/${quiz.id}`, function (html) {
+            $('#learningPageContent').html(html); 
+        }).fail(function () {
+            $('#learningPageContent').html('<div class="alert alert-danger">Unable to load the quiz. Please try again.</div>');
+        });
     }
+
+    
 
     function handleLiveSessionFinishedHtml(session) {
 

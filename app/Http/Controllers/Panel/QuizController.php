@@ -496,37 +496,37 @@ class QuizController extends Controller
     {
         // Log tous les paramètres de requête pour débogage
         \Log::info('Paramètres de filtrage reçus:', $request->all());
-        
+
         $query = Quiz::where('teacher_id', auth()->id())->orderBy('created_by', 'desc');
-        
+
         // Filtrer par statut
         if ($request->filled('status')) {
             $query->where('status', $request->status);
             \Log::info('Filtrage par statut:', ['status' => $request->status]);
         }
-        
+
         // Filtrer par niveau
         if ($request->filled('level')) {
-            $query->whereHas('level', function($q) use ($request) {
+            $query->whereHas('level', function ($q) use ($request) {
                 $q->where('name', $request->level);
             });
             \Log::info('Filtrage par niveau:', ['level' => $request->level]);
         }
-        
+
         // Filtrer par matière
         if ($request->filled('material')) {
-            $query->whereHas('material', function($q) use ($request) {
+            $query->whereHas('material', function ($q) use ($request) {
                 $q->where('name', $request->material);
             });
             \Log::info('Filtrage par matière:', ['material' => $request->material]);
         }
-        
+
         // Recherche par titre
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
             \Log::info('Recherche par titre:', ['search' => $request->search]);
         }
-        
+
         // Utiliser withQueryString pour préserver les paramètres dans les liens de pagination
         $quizzes = $query->paginate(9)->withQueryString();
 
@@ -559,7 +559,7 @@ class QuizController extends Controller
 
         return response()->json(['success' => true, 'title' => $quiz->title]);
     }
-    
+
     /**
      * Mettre à jour l'ordre des questions d'un quiz
      *
@@ -571,13 +571,13 @@ class QuizController extends Controller
         $request->validate([
             'quiz_id' => 'required|exists:quiz,id',
             'question_order' => 'required|array',
-            'question_order.*' => 'required|exists:quiz_questions,id'
+            'question_order.*' => 'required|exists:quiz_questions,id',
         ]);
-        
+
         try {
             // Récupérer le quiz
             $quiz = Quiz::findOrFail($request->quiz_id);
-            
+
             // Mettre à jour l'ordre de chaque question
             foreach ($request->question_order as $index => $questionId) {
                 \DB::table('quiz_questions')
@@ -585,17 +585,20 @@ class QuizController extends Controller
                     ->where('quiz_id', $quiz->id)
                     ->update(['order' => $index + 1]);
             }
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'تم تحديث ترتيب الأسئلة بنجاح'
+                'message' => 'تم تحديث ترتيب الأسئلة بنجاح',
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'حدث خطأ أثناء تحديث ترتيب الأسئلة',
-                'error' => $e->getMessage()
-            ], 500);
+            return response()->json(
+                [
+                    'success' => false,
+                    'message' => 'حدث خطأ أثناء تحديث ترتيب الأسئلة',
+                    'error' => $e->getMessage(),
+                ],
+                500,
+            );
         }
     }
 
@@ -631,11 +634,11 @@ class QuizController extends Controller
             $quiz = Quiz::findOrFail($request->quiz_id);
             $chapter = \App\Models\WebinarChapter::findOrFail($request->chapter_id);
             $webinar = $chapter->webinar;
-            
+
             // Vérification de compatibilité niveau et matière
             $compatible = true;
             $message = '';
-            
+
             // Vérifier la compatibilité du niveau
             if (!empty($webinar->level_id) && !empty($quiz->level_id) && $webinar->level_id != $quiz->level_id) {
                 $compatible = false;
@@ -643,7 +646,7 @@ class QuizController extends Controller
                 $quizLevel = \App\Models\School_level::find($quiz->level_id);
                 $message = 'المستوى غير متطابق: الفصل (' . ($webinarLevel ? $webinarLevel->name : 'غير معروف') . ') والتحدي (' . ($quizLevel ? $quizLevel->name : 'غير معروف') . ')';
             }
-            
+
             // Vérifier la compatibilité de la matière (matiere_id dans Webinar, material_id dans Quiz)
             if ($compatible && !empty($webinar->matiere_id) && !empty($quiz->material_id) && $webinar->matiere_id != $quiz->material_id) {
                 $compatible = false;
@@ -651,12 +654,12 @@ class QuizController extends Controller
                 $quizMaterial = \App\Models\Material::find($quiz->material_id);
                 $message = 'المادة غير متطابقة: الفصل (' . ($webinarMaterial ? $webinarMaterial->name : 'غير معروف') . ') والتحدي (' . ($quizMaterial ? $quizMaterial->name : 'غير معروف') . ')';
             }
-            
+
             // Si non compatible, retourner une erreur
             if (!$compatible) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-            
+
             // Si compatible, poursuivre l'assignation
             $quiz->model_type = 'App\\Models\\WebinarChapter';
             $quiz->model_id = $request->chapter_id;
@@ -674,7 +677,7 @@ class QuizController extends Controller
                     $notification->sender_type = 'admin';
                     $notification->sender_id = auth()->id();
                     $notification->target_type = 'multiple';
-                   
+
                     $notification->save();
 
                     \Log::info('Notification créée: ' . $notification->id);
@@ -832,11 +835,15 @@ class QuizController extends Controller
 
         $attempt->update(['score' => $score]);
 
-        return view('web.default.panel.quiz.child.result', [
-            'quiz' => $quiz,
-            'attempt' => $attempt,
-            'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
-        ]);
+        return response()->view(
+            'web.default.panel.quiz.child.result',
+            [
+                'quiz' => $quiz,
+                'attempt' => $attempt,
+                'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
+            ],
+            200,
+        );
     }
     public function storeAttempt(Request $request, $quiz_id)
     {
@@ -850,7 +857,7 @@ class QuizController extends Controller
         $attempt = QuizAttemptScore::create([
             'quiz_id' => $quiz->id,
             'child_id' => $childId,
-            'score' => 0, 
+            'score' => 0,
             'score_total' => $score_total,
             'submitted_at' => now(),
         ]);
@@ -876,9 +883,7 @@ class QuizController extends Controller
                 if ($isCorrect) {
                     $score += $question->score;
                 }
-            }
-
-            elseif ($question->type === 'binaire' && $userAnswer !== null) {
+            } elseif ($question->type === 'binaire' && $userAnswer !== null) {
                 $expected = $question->is_valid ? 'true' : 'false';
                 $isCorrect = $userAnswer === $expected;
 
@@ -895,9 +900,7 @@ class QuizController extends Controller
                 if ($isCorrect) {
                     $score += $question->score;
                 }
-            }
-
-            elseif ($question->type === 'arrow' && is_array($userAnswer)) {
+            } elseif ($question->type === 'arrow' && is_array($userAnswer)) {
                 $correctPairs = $question->answers
                     ->mapWithKeys(function ($a) {
                         return [$a->answer_text => $a->matching];
@@ -939,5 +942,32 @@ class QuizController extends Controller
             'attempt' => $attempt,
             'submissions' => $submissions,
         ]);
+    }
+    /**
+     * Get the last attempt of the child and display the result.
+     */
+    public function getLastAttemptResult($quiz_id)
+    {
+        $childId = auth()->id();
+
+        $quiz = Quiz::with('questions.answers')->findOrFail($quiz_id);
+
+        $lastAttempt = QuizAttemptScore::where('quiz_id', $quiz_id)->where('child_id', $childId)->orderByDesc('attempt_number')->first();
+
+        if (!$lastAttempt) {
+            return response()->json(['message' => 'No attempt found.'], 404);
+        }
+
+        $submissions = QuizSubmissions::with('question.answers')->where('attempt_id', $lastAttempt->id)->get();
+
+        return response()->view(
+            'web.default.panel.quiz.child.result',
+            [
+                'quiz' => $quiz,
+                'attempt' => $lastAttempt,
+                'submissions' => $submissions,
+            ],
+            200,
+        );
     }
 }
