@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
 use App\Models\Video;
 use App\Models\NotificationTemplateTranslation;
 use App\Models\SubscribeUse;
+use App\QuizNotificationUsers;
 
 class User extends Authenticatable
 {
@@ -46,13 +47,9 @@ class User extends Authenticatable
      * @var array
      */
     protected $guarded = ['id'];
-    protected $hidden = [
-        'password', 'remember_token', 'google_id', 'facebook_id', 'role_id'
-    ];
+    protected $hidden = ['password', 'remember_token', 'google_id', 'facebook_id', 'role_id'];
 
-    static $statuses = [
-        'active', 'pending', 'inactive'
-    ];
+    static $statuses = ['active', 'pending', 'inactive'];
     /**
      * The attributes that should be cast to native types.
      *
@@ -71,6 +68,11 @@ class User extends Authenticatable
     {
         return $this->hasOne(Enfant::class, 'user_id');
     }
+    public function quizNotifications()
+    {
+        return $this->hasMany(QuizNotificationUsers::class, 'receiver_id');
+    }
+
     public function isOnline()
     {
         // Set threshold (e.g., 5 minutes)
@@ -80,28 +82,29 @@ class User extends Authenticatable
     }
     public function viewedVideos()
     {
-    return $this->belongsToMany(Video::class, 'user_views');
+        return $this->belongsToMany(Video::class, 'user_views');
     }
 
     static function getAdmin()
     {
         $role = Role::where('name', Role::$admin)->first();
 
-        $admin = self::where('role_name', $role->name)
-            ->where('role_id', $role->id)
-            ->first();
+        $admin = self::where('role_name', $role->name)->where('role_id', $role->id)->first();
 
         return $admin;
     }
-    public function levels() {
+    public function levels()
+    {
         return $this->belongsToMany('App\Models\School_level', 'user_matiere', 'teacher_id', 'level_id');
     }
-    
-    public function childLevel() {
+
+    public function childLevel()
+    {
         return $this->belongsTo('App\Models\School_level', 'level_id');
     }
-    
-    public function materials() {
+
+    public function materials()
+    {
         return $this->belongsToMany('App\Models\Material', 'user_matiere', 'teacher_id', 'matiere_id');
     }
     public function subscriptions1()
@@ -112,7 +115,8 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'teachers', 'teacher_id', 'users_id');
     }
-    public function follows(){
+    public function follows()
+    {
         return $this->hasMany(Follow::class, 'user_id');
     }
     public function videos()
@@ -200,15 +204,15 @@ class User extends Authenticatable
         $levels = null;
         $bit = $this->attributes['level_of_training'];
 
-        if (!empty($bit) and is_string($bit)) { // in host with mariaDB
+        if (!empty($bit) and is_string($bit)) {
+            // in host with mariaDB
             try {
-                $tmp = (int)bin2hex($bit);
+                $tmp = (int) bin2hex($bit);
 
                 if (is_numeric($tmp) and $tmp > 0 and $tmp <= 7) {
                     $bit = $tmp;
                 }
             } catch (\Exception $exception) {
-
             }
         }
 
@@ -234,7 +238,6 @@ class User extends Authenticatable
         return $this->user_group;
     }
 
-
     public static function generatePassword($password)
     {
         return password_hash($password, PASSWORD_BCRYPT);
@@ -247,9 +250,7 @@ class User extends Authenticatable
 
     public function hasMeeting()
     {
-        return Meeting::where('disabled', false)
-            ->where('teacher_id', $this->id)
-            ->first();
+        return Meeting::where('disabled', false)->where('teacher_id', $this->id)->first();
     }
 
     public function ReserveMeetings()
@@ -262,7 +263,6 @@ class User extends Authenticatable
         return $this->hasOne('App\Models\AffiliateCode', 'user_id', 'id');
     }
 
-  
     public function following()
     {
         return Follow::where('follower', $this->id)->where('status', Follow::$accepted)->get();
@@ -270,8 +270,7 @@ class User extends Authenticatable
 
     public function webinars()
     {
-        return $this->hasMany('App\Models\Webinar', 'creator_id', 'id')
-            ->orWhere('teacher_id', $this->id);
+        return $this->hasMany('App\Models\Webinar', 'creator_id', 'id')->orWhere('teacher_id', $this->id);
     }
 
     public function products()
@@ -308,8 +307,7 @@ class User extends Authenticatable
     {
         $webinars = Webinar::where('status', 'active')
             ->where(function ($query) {
-                $query->where('creator_id', $this->id)
-                    ->orWhere('teacher_id', $this->id);
+                $query->where('creator_id', $this->id)->orWhere('teacher_id', $this->id);
             })
             ->orderBy('created_at', 'desc');
 
@@ -340,7 +338,7 @@ class User extends Authenticatable
     }
     public function students()
     {
-        return $this->hasMany(User::class, 'organ_id'); 
+        return $this->hasMany(User::class, 'organ_id');
     }
     public function certificates()
     {
@@ -372,7 +370,6 @@ class User extends Authenticatable
         return $this->hasOne($this, 'id', 'organ_id');
     }
 
-
     public function getOrganizationTeachers()
     {
         return $this->hasMany($this, 'organ_id', 'id')->where('role_name', Role::$teacher);
@@ -392,12 +389,9 @@ class User extends Authenticatable
         return $this->hasMany(SubscribeUse::class, 'user_id', 'id');
     }
 
-
     public function rates()
     {
-        $webinars = $this->webinars()
-            ->where('status', 'active')
-            ->get();
+        $webinars = $this->webinars()->where('status', 'active')->get();
 
         $rate = 0;
 
@@ -451,7 +445,7 @@ class User extends Authenticatable
         $financialSettings = getFinancialSettings();
 
         if (!empty($financialSettings) and !empty($financialSettings['commission'])) {
-            $commission = (int)$financialSettings['commission'];
+            $commission = (int) $financialSettings['commission'];
         }
 
         $getUserGroup = $this->getUserGroup();
@@ -468,47 +462,27 @@ class User extends Authenticatable
 
     public function getIncome()
     {
-        $totalIncome = Accounting::where('user_id', $this->id)
-            ->where('type_account', Accounting::$income)
-            ->where('type', Accounting::$addiction)
-            ->where('system', false)
-            ->where('tax', false)
-            ->sum('amount');
+        $totalIncome = Accounting::where('user_id', $this->id)->where('type_account', Accounting::$income)->where('type', Accounting::$addiction)->where('system', false)->where('tax', false)->sum('amount');
 
         return $totalIncome;
     }
 
     public function getPayout()
     {
-        $credit = Accounting::where('user_id', $this->id)
-            ->where('type_account', Accounting::$income)
-            ->where('type', Accounting::$addiction)
-            ->where('system', false)
-            ->where('tax', false)
-            ->sum('amount');
+        $credit = Accounting::where('user_id', $this->id)->where('type_account', Accounting::$income)->where('type', Accounting::$addiction)->where('system', false)->where('tax', false)->sum('amount');
 
-        $debit = Accounting::where('user_id', $this->id)
-            ->where('type_account', Accounting::$income)
-            ->where('type', Accounting::$deduction)
-            ->where('system', false)
-            ->where('tax', false)
-            ->sum('amount');
+        $debit = Accounting::where('user_id', $this->id)->where('type_account', Accounting::$income)->where('type', Accounting::$deduction)->where('system', false)->where('tax', false)->sum('amount');
 
         return $credit - $debit;
     }
 
     public function getAccountingCharge()
     {
-        $query = Accounting::where('user_id', $this->id)
-            ->where('type_account', Accounting::$asset)
-            ->where('system', false)
-            ->where('tax', false);
+        $query = Accounting::where('user_id', $this->id)->where('type_account', Accounting::$asset)->where('system', false)->where('tax', false);
 
-        $additions = deepClone($query)->where('type', Accounting::$addiction)
-            ->sum('amount');
+        $additions = deepClone($query)->where('type', Accounting::$addiction)->sum('amount');
 
-        $deductions = deepClone($query)->where('type', Accounting::$deduction)
-            ->sum('amount');
+        $deductions = deepClone($query)->where('type', Accounting::$deduction)->sum('amount');
 
         $charge = $additions - $deductions;
         return $charge > 0 ? $charge : 0;
@@ -516,17 +490,9 @@ class User extends Authenticatable
 
     public function getAccountingBalance()
     {
-        $additions = Accounting::where('user_id', $this->id)
-            ->where('type', Accounting::$addiction)
-            ->where('system', false)
-            ->where('tax', false)
-            ->sum('amount');
+        $additions = Accounting::where('user_id', $this->id)->where('type', Accounting::$addiction)->where('system', false)->where('tax', false)->sum('amount');
 
-        $deductions = Accounting::where('user_id', $this->id)
-            ->where('type', Accounting::$deduction)
-            ->where('system', false)
-            ->where('tax', false)
-            ->sum('amount');
+        $deductions = Accounting::where('user_id', $this->id)->where('type', Accounting::$deduction)->where('system', false)->where('tax', false)->sum('amount');
 
         $balance = $additions - $deductions;
         return $balance > 0 ? $balance : 0;
@@ -534,15 +500,12 @@ class User extends Authenticatable
 
     public function getPurchaseAmounts()
     {
-        return Sale::where('buyer_id', $this->id)
-            ->sum('amount');
+        return Sale::where('buyer_id', $this->id)->sum('amount');
     }
 
     public function getSaleAmounts()
     {
-        return Sale::where('seller_id', $this->id)
-            ->whereNull('refund_at')
-            ->sum('amount');
+        return Sale::where('seller_id', $this->id)->whereNull('refund_at')->sum('amount');
     }
 
     public function sales()
@@ -554,46 +517,33 @@ class User extends Authenticatable
 
     public function salesCount()
     {
-        return Sale::where('seller_id', $this->id)
-            ->whereNotNull('webinar_id')
-            ->where('type', 'webinar')
-            ->whereNull('refund_at')
-            ->count();
+        return Sale::where('seller_id', $this->id)->whereNotNull('webinar_id')->where('type', 'webinar')->whereNull('refund_at')->count();
     }
 
     public function productsSalesCount()
     {
-        return Sale::where('seller_id', $this->id)
-            ->whereNotNull('product_order_id')
-            ->where('type', 'product')
-            ->whereNull('refund_at')
-            ->count();
+        return Sale::where('seller_id', $this->id)->whereNotNull('product_order_id')->where('type', 'product')->whereNull('refund_at')->count();
     }
 
     public function getUnReadNotifications()
     {
         $notifications = Notification::where(function ($query) {
-            $query->where(function ($query) {
-                $query->where('user_id', $this->id)
-                    ->where('type', 'single');
-            })->orWhere(function ($query) {
-                if (!$this->isAdmin()) {
-                    $query->whereNull('user_id')
-                        ->whereNull('group_id')
-                        ->where('type', 'all_users');
-                }
-            });
+            $query
+                ->where(function ($query) {
+                    $query->where('user_id', $this->id)->where('type', 'single');
+                })
+                ->orWhere(function ($query) {
+                    if (!$this->isAdmin()) {
+                        $query->whereNull('user_id')->whereNull('group_id')->where('type', 'all_users');
+                    }
+                });
         })
             ->orderBy('created_at', 'desc')
             ->get();
 
         $userGroup = $this->userGroup()->first();
         if (!empty($userGroup)) {
-            $groupNotifications = Notification::where('group_id', $userGroup->group_id)
-                ->where('type', 'group')
-                ->doesntHave('notificationStatus')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $groupNotifications = Notification::where('group_id', $userGroup->group_id)->where('type', 'group')->doesntHave('notificationStatus')->orderBy('created_at', 'desc')->get();
 
             if (!empty($groupNotifications) and !$groupNotifications->isEmpty()) {
                 $notifications = $notifications->merge($groupNotifications);
@@ -601,150 +551,130 @@ class User extends Authenticatable
         }
 
         if ($this->isUser()) {
-            $studentsNotifications = Notification::whereNull('user_id')
-                ->whereNull('group_id')
-                ->where('type', 'students')
-                ->doesntHave('notificationStatus')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $studentsNotifications = Notification::whereNull('user_id')->whereNull('group_id')->where('type', 'students')->doesntHave('notificationStatus')->orderBy('created_at', 'desc')->get();
             if (!empty($studentsNotifications) and !$studentsNotifications->isEmpty()) {
                 $notifications = $notifications->merge($studentsNotifications);
             }
         }
 
         if ($this->isTeacher()) {
-            $instructorNotifications = Notification::whereNull('user_id')
-                ->whereNull('group_id')
-                ->where('type', 'instructors')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $instructorNotifications = Notification::whereNull('user_id')->whereNull('group_id')->where('type', 'instructors')->orderBy('created_at', 'desc')->get();
             if (!empty($instructorNotifications) and !$instructorNotifications->isEmpty()) {
                 $notifications = $notifications->merge($instructorNotifications);
             }
         }
 
         if ($this->isOrganization()) {
-            $organNotifications = Notification::whereNull('user_id')
-                ->whereNull('group_id')
-                ->where('type', 'organizations')
-                ->doesntHave('notificationStatus')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $organNotifications = Notification::whereNull('user_id')->whereNull('group_id')->where('type', 'organizations')->doesntHave('notificationStatus')->orderBy('created_at', 'desc')->get();
             if (!empty($organNotifications) and !$organNotifications->isEmpty()) {
                 $notifications = $notifications->merge($organNotifications);
             }
         }
 
         return $notifications;
-           
     }
-//     public function getUnReadNotifications()
-// {
-//     $locale = app()->getLocale();
-    
-//     $notifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
-//         ->whereHas('template.notification', function ($query) {
-//             $query->where(function ($query) {
-//                 $query->where(function ($query) {
-//                     $query->where('user_id', $this->id)
-//                           ->where('type', 'single');
-//                 })->orWhere(function ($query) {
-//                     if (!$this->isAdmin()) {
-//                         $query->whereNull('user_id')
-//                               ->whereNull('group_id')
-//                               ->where('type', 'all_users');
-//                     }
-//                 });
-//             });
-//         })
-//         ->whereDoesntHave('template.notification.notificationStatus')
-//         ->orderBy('created_at', 'desc')
-//         ->get();
+    //     public function getUnReadNotifications()
+    // {
+    //     $locale = app()->getLocale();
 
-//     //------> Group notifications
-//     $userGroup = $this->userGroup()->first();
-//     if (!empty($userGroup)) {
-//         $groupNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
-//             ->whereHas('template.notification', function ($query) use ($userGroup) {
-//                 $query->where('group_id', $userGroup->group_id)
-//                       ->where('type', 'group');
-//             })
-//             ->whereDoesntHave('template.notification.notificationStatus')
-//             ->orderBy('created_at', 'desc')
-//             ->get();
+    //     $notifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
+    //         ->whereHas('template.notification', function ($query) {
+    //             $query->where(function ($query) {
+    //                 $query->where(function ($query) {
+    //                     $query->where('user_id', $this->id)
+    //                           ->where('type', 'single');
+    //                 })->orWhere(function ($query) {
+    //                     if (!$this->isAdmin()) {
+    //                         $query->whereNull('user_id')
+    //                               ->whereNull('group_id')
+    //                               ->where('type', 'all_users');
+    //                     }
+    //                 });
+    //             });
+    //         })
+    //         ->whereDoesntHave('template.notification.notificationStatus')
+    //         ->orderBy('created_at', 'desc')
+    //         ->get();
 
-//         if (!empty($groupNotifications) && !$groupNotifications->isEmpty()) {
-//             $notifications = $notifications->merge($groupNotifications);
-//         }
-//     }
+    //     //------> Group notifications
+    //     $userGroup = $this->userGroup()->first();
+    //     if (!empty($userGroup)) {
+    //         $groupNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
+    //             ->whereHas('template.notification', function ($query) use ($userGroup) {
+    //                 $query->where('group_id', $userGroup->group_id)
+    //                       ->where('type', 'group');
+    //             })
+    //             ->whereDoesntHave('template.notification.notificationStatus')
+    //             ->orderBy('created_at', 'desc')
+    //             ->get();
 
-//     //--------> Childs notifications
-//     if ($this->isUser()) {
-//         $studentsNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
-//             ->whereHas('template.notification', function ($query) {
-//                 $query->whereNull('user_id')
-//                       ->whereNull('group_id')
-//                       ->where('type', 'students');
-//             })
-//             ->whereDoesntHave('template.notification.notificationStatus')
-//             ->orderBy('created_at', 'desc')
-//             ->get();
+    //         if (!empty($groupNotifications) && !$groupNotifications->isEmpty()) {
+    //             $notifications = $notifications->merge($groupNotifications);
+    //         }
+    //     }
 
-//         if (!empty($studentsNotifications) && !$studentsNotifications->isEmpty()) {
-//             $notifications = $notifications->merge($studentsNotifications);
-//         }
-//     }
+    //     //--------> Childs notifications
+    //     if ($this->isUser()) {
+    //         $studentsNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
+    //             ->whereHas('template.notification', function ($query) {
+    //                 $query->whereNull('user_id')
+    //                       ->whereNull('group_id')
+    //                       ->where('type', 'students');
+    //             })
+    //             ->whereDoesntHave('template.notification.notificationStatus')
+    //             ->orderBy('created_at', 'desc')
+    //             ->get();
 
-//     //-------> Teachers notifications
-//     if ($this->isTeacher()) {
-//         $instructorNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
-//             ->whereHas('template.notification', function ($query) {
-//                 $query->whereNull('user_id')
-//                       ->whereNull('group_id')
-//                       ->where('type', 'instructors');
-//             })
-//             ->whereDoesntHave('template.notification.notificationStatus')
-//             ->orderBy('created_at', 'desc')
-//             ->get();
+    //         if (!empty($studentsNotifications) && !$studentsNotifications->isEmpty()) {
+    //             $notifications = $notifications->merge($studentsNotifications);
+    //         }
+    //     }
 
-//         if (!empty($instructorNotifications) && !$instructorNotifications->isEmpty()) {
-//             $notifications = $notifications->merge($instructorNotifications);
-//         }
-//     }
+    //     //-------> Teachers notifications
+    //     if ($this->isTeacher()) {
+    //         $instructorNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
+    //             ->whereHas('template.notification', function ($query) {
+    //                 $query->whereNull('user_id')
+    //                       ->whereNull('group_id')
+    //                       ->where('type', 'instructors');
+    //             })
+    //             ->whereDoesntHave('template.notification.notificationStatus')
+    //             ->orderBy('created_at', 'desc')
+    //             ->get();
 
-//     //----> Parent notifications
-//     if ($this->isOrganization()) {
-//         $organNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
-//             ->whereHas('template.notification', function ($query) {
-//                 $query->whereNull('user_id')
-//                       ->whereNull('group_id')
-//                       ->where('type', 'organizations');
-//             })
-//             ->whereDoesntHave('template.notification.notificationStatus')
-//             ->orderBy('created_at', 'desc')
-//             ->get();
+    //         if (!empty($instructorNotifications) && !$instructorNotifications->isEmpty()) {
+    //             $notifications = $notifications->merge($instructorNotifications);
+    //         }
+    //     }
 
-//         if (!empty($organNotifications) && !$organNotifications->isEmpty()) {
-//             $notifications = $notifications->merge($organNotifications);
-//         }
-//     }
+    //     //----> Parent notifications
+    //     if ($this->isOrganization()) {
+    //         $organNotifications = \App\Models\NotificationTemplateTranslation::where('language', $locale)
+    //             ->whereHas('template.notification', function ($query) {
+    //                 $query->whereNull('user_id')
+    //                       ->whereNull('group_id')
+    //                       ->where('type', 'organizations');
+    //             })
+    //             ->whereDoesntHave('template.notification.notificationStatus')
+    //             ->orderBy('created_at', 'desc')
+    //             ->get();
 
-//     return $notifications;
-// }
+    //         if (!empty($organNotifications) && !$organNotifications->isEmpty()) {
+    //             $notifications = $notifications->merge($organNotifications);
+    //         }
+    //     }
 
-
-    
-
+    //     return $notifications;
+    // }
 
     public function getUnreadNoticeboards()
     {
         $purchasedCoursesIds = $this->getPurchasedCoursesIds();
-        $purchasedCoursesInstructorsIds = Webinar::whereIn('id', $purchasedCoursesIds)
-            ->pluck('teacher_id')
-            ->toArray();
+        $purchasedCoursesInstructorsIds = Webinar::whereIn('id', $purchasedCoursesIds)->pluck('teacher_id')->toArray();
 
         $noticeboards = Noticeboard::where(function ($query) {
-            $query->whereNotNull('organ_id')
+            $query
+                ->whereNotNull('organ_id')
                 ->where('organ_id', $this->organ_id)
                 ->where(function ($query) {
                     if ($this->isOrganization()) {
@@ -759,29 +689,28 @@ class User extends Authenticatable
                         $query->whereIn('type', ['students_and_instructors', $type]);
                     }
                 });
-        })->orWhere(function ($query) {
-            $type = ['all'];
-
-            if ($this->isUser()) {
-                $type = array_merge($type, ['students', 'students_and_instructors']);
-            } elseif ($this->isTeacher()) {
-                $type = array_merge($type, ['instructors', 'students_and_instructors']);
-            } elseif ($this->isOrganization()) {
-                $type = array_merge($type, ['organizations']);
-            }
-
-            $query->whereNull('organ_id')
-                ->whereNull('instructor_id')
-                ->whereIn('type', $type);
-        })->orWhere(function ($query) use ($purchasedCoursesInstructorsIds) {
-            $query->whereNull('webinar_id')
-                ->whereIn('instructor_id', $purchasedCoursesInstructorsIds);
-        })->orWhere(function ($query) use ($purchasedCoursesIds) {
-            $query->whereIn('webinar_id', $purchasedCoursesIds);
         })
+            ->orWhere(function ($query) {
+                $type = ['all'];
+
+                if ($this->isUser()) {
+                    $type = array_merge($type, ['students', 'students_and_instructors']);
+                } elseif ($this->isTeacher()) {
+                    $type = array_merge($type, ['instructors', 'students_and_instructors']);
+                } elseif ($this->isOrganization()) {
+                    $type = array_merge($type, ['organizations']);
+                }
+
+                $query->whereNull('organ_id')->whereNull('instructor_id')->whereIn('type', $type);
+            })
+            ->orWhere(function ($query) use ($purchasedCoursesInstructorsIds) {
+                $query->whereNull('webinar_id')->whereIn('instructor_id', $purchasedCoursesInstructorsIds);
+            })
+            ->orWhere(function ($query) use ($purchasedCoursesIds) {
+                $query->whereIn('webinar_id', $purchasedCoursesIds);
+            })
             ->orderBy('created_at', 'desc')
             ->get();
-
 
         /*
         ->whereDoesntHave('noticeboardStatus', function ($qu) {
@@ -796,26 +725,17 @@ class User extends Authenticatable
     {
         $webinarIds = [];
 
-        $sales = Sale::where('buyer_id', $this->id)
-            ->whereNotNull('webinar_id')
-            ->where('type', 'webinar')
-            ->whereNull('refund_at')
-            ->get();
+        $sales = Sale::where('buyer_id', $this->id)->whereNotNull('webinar_id')->where('type', 'webinar')->whereNull('refund_at')->get();
 
         foreach ($sales as $sale) {
             if ($sale->payment_method == Sale::$subscribe) {
                 $subscribe = $sale->getUsedSubscribe($sale->buyer_id, $sale->webinar_id);
 
                 if (!empty($subscribe)) {
-                    $subscribeSale = Sale::where('buyer_id', $this->id)
-                        ->where('type', Sale::$subscribe)
-                        ->where('subscribe_id', $subscribe->id)
-                        ->whereNull('refund_at')
-                        ->latest('created_at')
-                        ->first();
+                    $subscribeSale = Sale::where('buyer_id', $this->id)->where('type', Sale::$subscribe)->where('subscribe_id', $subscribe->id)->whereNull('refund_at')->latest('created_at')->first();
 
                     if (!empty($subscribeSale)) {
-                        $usedDays = (int)diffTimestampDay(time(), $subscribeSale->created_at);
+                        $usedDays = (int) diffTimestampDay(time(), $subscribeSale->created_at);
                         if ($usedDays <= $subscribe->days) {
                             $webinarIds[] = $sale->webinar_id;
                         }
@@ -851,12 +771,9 @@ class User extends Authenticatable
         if (!empty($this->meeting)) {
             $meetingId = $this->meeting->id;
 
-            $reserves = ReserveMeeting::where('meeting_id', $meetingId)
-                ->where('status', 'finished')
-                ->get();
+            $reserves = ReserveMeeting::where('meeting_id', $meetingId)->where('status', 'finished')->get();
 
             if (!empty($reserves)) {
-
                 foreach ($reserves as $reserve) {
                     $meetingTime = $reserve->meetingTime;
 
@@ -879,13 +796,9 @@ class User extends Authenticatable
 
     public function getRewardPoints()
     {
-        $credit = RewardAccounting::where('user_id', $this->id)
-            ->where('status', RewardAccounting::ADDICTION)
-            ->sum('score');
+        $credit = RewardAccounting::where('user_id', $this->id)->where('status', RewardAccounting::ADDICTION)->sum('score');
 
-        $debit = RewardAccounting::where('user_id', $this->id)
-            ->where('status', RewardAccounting::DEDUCTION)
-            ->sum('score');
+        $debit = RewardAccounting::where('user_id', $this->id)->where('status', RewardAccounting::DEDUCTION)->sum('score');
 
         return $credit - $debit;
     }
@@ -923,9 +836,7 @@ class User extends Authenticatable
 
     public function getWaitingDeliveryProductOrdersCount()
     {
-        return ProductOrder::where('seller_id', $this->id)
-            ->where('status', ProductOrder::$waitingDelivery)
-            ->count();
+        return ProductOrder::where('seller_id', $this->id)->where('status', ProductOrder::$waitingDelivery)->count();
     }
 
     public function checkCanAccessToStore()
@@ -974,7 +885,6 @@ class User extends Authenticatable
             $province = Region::where('id', $this->province_id)->first();
 
             if (!empty($province)) {
-
                 if (!empty($address)) {
                     $address .= '/';
                 }

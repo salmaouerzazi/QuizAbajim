@@ -83,11 +83,14 @@
                                         data-locale="{{ mb_strtoupper($chapter->locale) }}">
                                         <i data-feather="edit-3" class="mr-10 cursor-pointer" height="20"></i>
                                     </button>
-
-                                    <a href="/panel/chapters/{{ $chapter->id }}/delete"
-                                        class="delete-action btn btn-sm btn-transparent text-gray">
-                                        <i data-feather="trash-2" class="mr-10 cursor-pointer" height="20"></i>
-                                    </a>
+                                    <form action="/panel/chapters/{{ $chapter->id }}/delete" method="GET"
+                                        class="delete-chapter-form">
+                                        @csrf
+                                        <button type="submit"
+                                            class="delete-action btn btn-sm btn-transparent text-gray">
+                                            <i data-feather="trash-2" class="mr-10 cursor-pointer" height="20"></i>
+                                        </button>
+                                    </form>
 
                                     <i data-feather="move" class="move-icon mr-10 cursor-pointer text-gray"
                                         height="20"></i>
@@ -100,7 +103,6 @@
                                         aria-expanded="false"></i>
                                 </div>
                             </div>
-
                             <div id="collapseChapter{{ !empty($chapter) ? $chapter->id : 'record' }}"
                                 aria-labelledby="chapter_{{ !empty($chapter) ? $chapter->id : 'record' }}"
                                 class=" collapse" role="tabpanel">
@@ -108,8 +110,7 @@
                                     <div class="accordion-content-wrapper mt-15"
                                         id="chapterContentAccordion{{ !empty($chapter) ? $chapter->id : '' }}"
                                         role="tablist" aria-multiselectable="true">
-
-                                        @if (!empty($chapter->chapterItems) and count($chapter->chapterItems))
+                                        @if (!empty($chapter->chapterItems) and count($chapter->chapterItems) or !empty($chapter->quiz))
                                             <ul class="draggable-content-lists draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-drag-class="draggable-lists-chapter-{{ $chapter->id }}"
                                                 data-order-table="webinar_chapter_items">
@@ -139,12 +140,15 @@
                                                         @endforeach
                                                     @endif
                                                     {{-- @elseif($chapterItem->type == \App\Models\WebinarChapterItem::$chapterQuiz and !empty($chapter->model_type)&&$chapter->model_type== 'quiz')
+                                                    @endif
+                                                @endforeach
+                                                @foreach ($quizmodel as $q)
+                                                    @if ($q->model_id == $chapter->id)
                                                         @include(
                                                             'web.default.panel.webinar.create_includes.accordions.quiz',
                                                             [
-                                                                'quizInfo' => $chapterItem->quiz,
-                                                                'chapter' => $chapter,
-                                                                'chapterItem' => $chapterItem,
+                                                                'quizInfo' => $q,
+                                                                'model_id' => $q->model_id,
                                                             ]
                                                         ) --}}
                                                 @endforeach
@@ -154,9 +158,7 @@
                                                 {{ trans('panel.no_content_yet') }}
                                             </h4>
                                         @endif
-
                                     </div>
-
                                 </div>
                             </div>
                         </li>
@@ -174,32 +176,34 @@
                     </div>
             @endif
         </div>
-
     </div>
 </div>
-<div class="modal fade" id="assignQuizModal{{ $chapter->id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">📘 اختيار تحدي</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
-            </div>
-            <div class="modal-body">
-                <select id="quizSelect{{ $chapter->id }}" class="form-control" required>
-                    @foreach ($quizzes as $quiz)
-                        <option value="{{ $quiz->id }}">{{ $quiz->title }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="modal-footer">
-                <button onclick="assignQuiz({{ $chapter->id }})" class="btn btn-success">
-                    تأكيد الربط
-                </button>
+@if (isset($chapter))
+    <div class="modal fade" id="assignQuizModal{{ $chapter->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📘 اختيار تحدي</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="quizSelectLoading{{ $chapter->id }}" class="text-center">
+                        <i class="fa fa-spinner fa-spin"></i> جاري تحميل التحديات المتاحة...
+                    </div>
+                    <select id="quizSelect{{ $chapter->id }}" class="form-control" required style="display:none;">
+                        <option value="">{{ trans('public.no_available_quizzes') }}</option>
+                    </select>
+
+                </div>
+                <div class="modal-footer">
+                    <button onclick="assignQuiz({{ $chapter->id }})" class="btn btn-success" type="button">
+                        تأكيد الربط
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
-
+@endif
 @push('scripts_bottom')
     <script>
         document.addEventListener('click', function(event) {
@@ -220,8 +224,82 @@
         });
     </script>
     <script>
+        // Ajouter des écouteurs d'événements pour l'ouverture des modaux de quiz
+        document.addEventListener('DOMContentLoaded', function() {
+            // Trouver tous les boutons qui ouvrent les modaux de quiz
+            document.querySelectorAll('[data-bs-toggle="modal"]').forEach(function(button) {
+                const modalId = button.getAttribute('data-bs-target');
+                if (modalId && modalId.includes('assignQuizModal')) {
+                    button.addEventListener('click', function() {
+                        const chapterId = modalId.replace('#assignQuizModal', '');
+                        loadFilteredQuizzes(chapterId);
+                    });
+                }
+            });
+        });
+        
+        // Fonction pour charger les quiz filtrés par niveau et matière
+        function loadFilteredQuizzes(chapterId) {
+            const loadingElement = document.getElementById('quizSelectLoading' + chapterId);
+            const selectElement = document.getElementById('quizSelect' + chapterId);
+            
+            // Afficher le chargement, masquer le select
+            loadingElement.style.display = 'block';
+            selectElement.style.display = 'none';
+            
+            // Vider le select
+            selectElement.innerHTML = '<option value="">{{ trans("public.no_available_quizzes") }}</option>';
+            
+            // Charger les quiz filtrés via notre nouvelle route dédiée
+            fetch(`{{ route('panel.quiz.filtered', '') }}/${chapterId}`, {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error("Request failed");
+                    return response.json();
+                })
+                .then(data => {
+                    // Masquer le chargement, afficher le select
+                    loadingElement.style.display = 'none';
+                    selectElement.style.display = 'block';
+                    
+                    // Si des quiz sont disponibles, les ajouter au select
+                    if (data.quizzes && data.quizzes.length > 0) {
+                        data.quizzes.forEach(quiz => {
+                            const option = document.createElement('option');
+                            option.value = quiz.id;
+                            option.textContent = quiz.title;
+                            selectElement.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading quizzes:", error);
+                    loadingElement.style.display = 'none';
+                    selectElement.style.display = 'block';
+                    Swal.fire({
+                        icon: "error",
+                        title: "خطأ في تحميل التحديات",
+                        text: error.message
+                    });
+                });
+        }
+        
         function assignQuiz(chapterId) {
             const quizId = document.getElementById('quizSelect' + chapterId).value;
+            
+            if (!quizId) {
+                Swal.fire({
+                    icon: "error",
+                    title: "يرجى اختيار تحدي",
+                    text: "لم يتم اختيار أي تحدي للربط"
+                });
+                return;
+            }
 
             fetch("{{ route('panel.quiz.assignToChapter') }}", {
                     method: "POST",
@@ -235,7 +313,11 @@
                     })
                 })
                 .then(response => {
-                    if (!response.ok) throw new Error("Request failed");
+                    if (!response.ok) {
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.message || "Request failed");
+                        });
+                    }
                     return response.json();
                 })
                 .then(data => {
@@ -250,7 +332,11 @@
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    Swal.fire(error.message, "", "error");
+                    Swal.fire({
+                        icon: "error",
+                        title: "خطأ في ربط التحدي",
+                        text: error.message
+                    });
                 });
         }
     </script>

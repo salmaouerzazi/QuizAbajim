@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Storage;
 use App\UserMatiere;
 use App\Models\School_level;
 use App\Models\Material;
+use App\Models\QuizSubmissions;
+use App\Models\QuizAttemptScore;
+
+use App\User;
 
 class QuizController extends Controller
 {
@@ -68,6 +72,8 @@ class QuizController extends Controller
         $quiz->material_id = $request->input('subject');
         $quiz->question_count = $request->input('num_questions', 5);
         $quiz->pdf_path = $path;
+        $quiz->title = $request->input('title', 'تحدي بدون عنوان');
+        $quiz->status = 'draft';
         $quiz->teacher_id = auth()->id();
         $quiz->text_content = $textContent; // texte extrait du PDF
         $quiz->created_by = (int) now()->timestamp;
@@ -195,6 +201,15 @@ class QuizController extends Controller
         }
 
         DB::commit();
+        $quiz->load(['teacher', 'material']);
+
+        // $children = User::where('role_name', 'enfant')->where('level_id', $quiz->level_id)->get();
+
+        // if ($children) {
+        //     foreach ($children as $child) {
+        //         $child->notify(new \App\Notifications\NewQuizNotification($quiz));
+        //     }
+        // }
 
         return redirect()->route('panel.quiz.edit', ['id' => $quiz->id]);
         // } catch (\Exception $e) {
@@ -353,14 +368,14 @@ class QuizController extends Controller
             $colA_raw = trim($matches[1]);
             $colB_raw = trim($matches[2]);
 
-            // ✅ Extraire les éléments de la colonne A
+            //  Extraire les éléments de la colonne A
             $colA = [];
             if (preg_match_all('/\d+\)\s*(.+)/u', $colA_raw, $matchesA, PREG_SET_ORDER)) {
                 foreach ($matchesA as $match) {
                     $colA[] = trim($match[1]);
                 }
             }
-            // ✅ Extraire les éléments de la colonne B avec leurs lettres
+            //  Extraire les éléments de la colonne B avec leurs lettres
             $colB_map = [];
             if (preg_match_all('/([أ-ي])\)\s*(.+)/u', $colB_raw, $matchesB, PREG_SET_ORDER)) {
                 foreach ($matchesB as $match) {
@@ -370,11 +385,11 @@ class QuizController extends Controller
                 }
             }
 
-            // ✅ Nettoyer les flèches et parser les correspondances
+            //  Nettoyer les flèches et parser les correspondances
             $mapping_raw = str_replace(['→', '➡️', '⇒', '=>', '⟶'], '->', trim($matches[3]));
             $mappings = array_filter(array_map('trim', explode("\n", $mapping_raw)));
 
-            // ✅ Construire les réponses à partir des correspondances
+            //  Construire les réponses à partir des correspondances
             foreach ($mappings as $line) {
                 if (preg_match('/(\d+)\s*->\s*([أ-ي])/u', $line, $link)) {
                     $indexA = (int) $link[1] - 1;
@@ -441,7 +456,7 @@ class QuizController extends Controller
 
             foreach ($request->input('questions') as $qIndex => $qData) {
                 $type = $qData['type'] ?? 'qcm';
-            
+
                 $question = new Question([
                     'quiz_id' => $quiz->id,
                     'type' => $type,
@@ -450,24 +465,25 @@ class QuizController extends Controller
                     'is_valid' => $type === 'binaire' ? ($qData['correct'] === 'true' ? 1 : 0) : null,
                 ]);
                 $question->save();
-            
+
                 // Pour Matching & QCM
                 if (!empty($qData['answers'])) {
                     foreach ($qData['answers'] as $i => $a) {
                         $answerText = trim($a['answer_text'] ?? '');
-                        if ($answerText === '') continue; // 🛡️ Empêche les réponses vides
-            
+                        if ($answerText === '') {
+                            continue;
+                        } //  Empêche les réponses vides
+
                         Answer::create([
                             'question_id' => $question->id,
                             'answer_text' => $answerText,
-                            'is_valid' => $type === 'qcm' && isset($qData['correct']) && (string)$qData['correct'] === (string)$i ? 1 : 0,
+                            'is_valid' => $type === 'qcm' && isset($qData['correct']) && (string) $qData['correct'] === (string) $i ? 1 : 0,
                             'matching' => $a['matching'] ?? null,
                         ]);
                     }
                 }
             }
-            
-            
+
             DB::commit();
             return redirect()->route('panel.quiz.drafts')->with('success', 'تم حفظ الاختبار في المسودات بنجاح.');
         } catch (\Exception $e) {
@@ -478,16 +494,41 @@ class QuizController extends Controller
     }
     public function drafts(Request $request)
     {
+        // Log tous les paramètres de requête pour débogage
+        \Log::info('Paramètres de filtrage reçus:', $request->all());
+
         $query = Quiz::where('teacher_id', auth()->id())->orderBy('created_by', 'desc');
+
+        // Filtrer par statut
         if ($request->filled('status')) {
-            $query->where('status', $request->status); // 'draft' ou 'published'
+            $query->where('status', $request->status);
+            \Log::info('Filtrage par statut:', ['status' => $request->status]);
         }
 
+        // Filtrer par niveau
+        if ($request->filled('level')) {
+            $query->whereHas('level', function ($q) use ($request) {
+                $q->where('name', $request->level);
+            });
+            \Log::info('Filtrage par niveau:', ['level' => $request->level]);
+        }
+
+        // Filtrer par matière
+        if ($request->filled('material')) {
+            $query->whereHas('material', function ($q) use ($request) {
+                $q->where('name', $request->material);
+            });
+            \Log::info('Filtrage par matière:', ['material' => $request->material]);
+        }
+
+        // Recherche par titre
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
+            \Log::info('Recherche par titre:', ['search' => $request->search]);
         }
 
-        $quizzes = $query->paginate(9);
+        // Utiliser withQueryString pour préserver les paramètres dans les liens de pagination
+        $quizzes = $query->paginate(9)->withQueryString();
 
         if ($request->ajax()) {
             return view('web.default.panel.quiz.teacher.partials.quizzes', compact('quizzes'))->render();
@@ -519,6 +560,48 @@ class QuizController extends Controller
         return response()->json(['success' => true, 'title' => $quiz->title]);
     }
 
+    /**
+     * Mettre à jour l'ordre des questions d'un quiz
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateOrder(Request $request)
+    {
+        $request->validate([
+            'quiz_id' => 'required|exists:quiz,id',
+            'question_order' => 'required|array',
+            'question_order.*' => 'required|exists:quiz_questions,id',
+        ]);
+
+        try {
+            // Récupérer le quiz
+            $quiz = Quiz::findOrFail($request->quiz_id);
+
+            // Mettre à jour l'ordre de chaque question
+            foreach ($request->question_order as $index => $questionId) {
+                \DB::table('quiz_questions')
+                    ->where('id', $questionId)
+                    ->where('quiz_id', $quiz->id)
+                    ->update(['order' => $index + 1]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحديث ترتيب الأسئلة بنجاح',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(
+                [
+                    'success' => false,
+                    'message' => 'حدث خطأ أثناء تحديث ترتيب الأسئلة',
+                    'error' => $e->getMessage(),
+                ],
+                500,
+            );
+        }
+    }
+
     public function deleteQuestion($id)
     {
         $question = Question::findOrFail($id);
@@ -542,16 +625,349 @@ class QuizController extends Controller
     }
     public function assignToChapter(Request $request)
     {
-        $request->validate([
-            'quiz_id' => 'required|exists:quiz,id',
-            'chapter_id' => 'required|exists:webinar_chapters,id',
+        try {
+            $request->validate([
+                'quiz_id' => 'required|exists:quiz,id',
+                'chapter_id' => 'required|exists:webinar_chapters,id',
+            ]);
+
+            $quiz = Quiz::findOrFail($request->quiz_id);
+            $chapter = \App\Models\WebinarChapter::findOrFail($request->chapter_id);
+            $webinar = $chapter->webinar;
+
+            // Vérification de compatibilité niveau et matière
+            $compatible = true;
+            $message = '';
+
+            // Vérifier la compatibilité du niveau
+            if (!empty($webinar->level_id) && !empty($quiz->level_id) && $webinar->level_id != $quiz->level_id) {
+                $compatible = false;
+                $webinarLevel = \App\Models\School_level::find($webinar->level_id);
+                $quizLevel = \App\Models\School_level::find($quiz->level_id);
+                $message = 'المستوى غير متطابق: الفصل (' . ($webinarLevel ? $webinarLevel->name : 'غير معروف') . ') والتحدي (' . ($quizLevel ? $quizLevel->name : 'غير معروف') . ')';
+            }
+
+            // Vérifier la compatibilité de la matière (matiere_id dans Webinar, material_id dans Quiz)
+            if ($compatible && !empty($webinar->matiere_id) && !empty($quiz->material_id) && $webinar->matiere_id != $quiz->material_id) {
+                $compatible = false;
+                $webinarMaterial = \App\Models\Material::find($webinar->matiere_id);
+                $quizMaterial = \App\Models\Material::find($quiz->material_id);
+                $message = 'المادة غير متطابقة: الفصل (' . ($webinarMaterial ? $webinarMaterial->name : 'غير معروف') . ') والتحدي (' . ($quizMaterial ? $quizMaterial->name : 'غير معروف') . ')';
+            }
+
+            // Si non compatible, retourner une erreur
+            if (!$compatible) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+
+            // Si compatible, poursuivre l'assignation
+            $quiz->model_type = 'App\\Models\\WebinarChapter';
+            $quiz->model_id = $request->chapter_id;
+            $quiz->status = 'published';
+            $quiz->save();
+
+            //  Créer une notification principale
+            try {
+                $chapter = \App\Models\WebinarChapter::find($request->chapter_id);
+                if ($chapter) {
+                    $notification = new \App\QuizNotification();
+                    $notification->title = 'هل أنت جاهز للتحدي؟';
+                    $notification->message = '🔥 اختبار جديد "' . $quiz->title . '" في الفصل "' . $chapter->title . '" بانتظارك! أظهر قوتك وأبهر الجميع بنتيجتك! 🏆';
+                    $notification->quiz_id = $quiz->id;
+                    $notification->sender_type = 'admin';
+                    $notification->sender_id = auth()->id();
+                    $notification->target_type = 'multiple';
+
+                    $notification->save();
+
+                    \Log::info('Notification créée: ' . $notification->id);
+
+                    // Créer des notifications pour chaque enfant dans le système
+                    try {
+                        $children = DB::select("SELECT id FROM users WHERE role_name = 'enfant'");
+                        $childrenCount = count($children);
+                        \Log::info('Nombre d\'enfants trouvés (SQL brut): ' . $childrenCount);
+                    } catch (\Exception $e) {
+                        \Log::error('Erreur lors de la récupération des enfants: ' . $e->getMessage());
+                        $children = [];
+                    }
+
+                    try {
+                        $tableInfo = DB::select('SHOW COLUMNS FROM quiz_notifications_users');
+                        \Log::info('Structure de la table quiz_notifications_users: ' . json_encode($tableInfo));
+                    } catch (\Exception $e) {
+                        \Log::error('Erreur lors de la vérification de la structure de la table: ' . $e->getMessage());
+                    }
+
+                    foreach ($children as $child) {
+                        $childId = $child->id;
+                        \Log::info('Traitement de l\'enfant ID: ' . $childId);
+
+                        try {
+                            // Méthode directe - Insert dans la base de données
+                            DB::statement(
+                                "INSERT INTO quiz_notifications_users
+                                 (notification_id, receiver_id, is_read, created_at, updated_at)
+                                 VALUES (?, ?, ?, ?, ?)",
+                                [$notification->id, $childId, 0, now(), now()],
+                            );
+                            \Log::info('Notification utilisateur créée pour enfant ' . $childId . ' avec DB::statement');
+                        } catch (\Exception $e) {
+                            \Log::error('Erreur lors de la création de notification (DB::statement): ' . $e->getMessage());
+
+                            try {
+                                $insertSQL = "INSERT INTO quiz_notifications_users
+                                             (notification_id, receiver_id, is_read, created_at, updated_at)
+                                             VALUES ({$notification->id}, {$childId}, 0, NOW(), NOW())";
+                                DB::unprepared($insertSQL);
+                                \Log::info('Notification utilisateur créée pour enfant ' . $childId . ' avec DB::unprepared');
+                            } catch (\Exception $e2) {
+                                \Log::error('Erreur lors de la création de notification (DB::unprepared): ' . $e2->getMessage());
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $notifError) {
+                // Log l'erreur mais ne pas bloquer l'assignation
+                \Log::error('Erreur création notification: ' . $notifError->getMessage());
+            }
+
+            return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+        } catch (\Exception $e) {
+            \Log::error('Erreur assignToChapter: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()], 500);
+        }
+    }
+    public function delete(Request $request)
+    {
+        $quiz = \App\Models\Quiz::findOrFail($request->quiz_id);
+
+        $quiz->model_type = null;
+        $quiz->model_id = null;
+
+        $quiz->status = 'draft';
+
+        $quiz->save();
+
+        return back()->with('success', 'تم إلغاء ربط التحدي بنجاح.');
+    }
+    public function showForChild($id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($id);
+
+        $chapter = \App\Models\WebinarChapter::where('id', $quiz->model_id)->first();
+        $course = $chapter ? $chapter->webinar : null;
+
+        return view('web.default.panel.quiz.child.doQuiz', compact('quiz', 'course'));
+    }
+    public function submitFromChild(Request $request, $id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($id);
+        $childId = auth()->id();
+        $answers = $request->input('answers', []);
+
+        $lastAttempt = QuizAttemptScore::where('quiz_id', $quiz->id)->where('child_id', $childId)->orderByDesc('attempt_number')->first();
+
+        $attemptNumber = $lastAttempt ? $lastAttempt->attempt_number + 1 : 1;
+
+        $totalScore = $quiz->questions->sum('score');
+
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'attempt_number' => $attemptNumber,
+            'score' => 0, // temporaire
+            'score_total' => $totalScore,
+            'submitted_at' => now(),
         ]);
 
-        $quiz = Quiz::findOrFail($request->quiz_id);
-        $quiz->model_type = \App\Models\WebinarChapter::class;
-        $quiz->model_id = $request->chapter_id;
-        $quiz->save();
-        return response()->json(['success' => true, 'message' => 'تم ربط الاختبار بالفصل بنجاح.']);
+        $score = 0;
 
+        foreach ($quiz->questions as $question) {
+            $userAnswer = $answers[$question->id] ?? null;
+            $isValid = false;
+
+            if ($question->type === 'binaire') {
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isValid = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => true,
+                ]);
+            } elseif ($question->type === 'qcm') {
+                $expectedId = $question->answers->where('is_valid', true)->first()?->id;
+                $isValid = $userAnswer == $expectedId;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'answer_id' => $userAnswer,
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
+            } elseif ($question->type === 'arrow') {
+                $expectedMap = $question->answers->mapWithKeys(fn($a) => [$a->answer_text => $a->matching])->toArray();
+                $userMap = is_string($userAnswer) ? json_decode($userAnswer, true) : $userAnswer ?? [];
+                $isValid = $userMap == $expectedMap;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'arrow_mapping' => json_encode($userMap),
+                    'is_valid' => $isValid,
+                    'is_boolean_question' => false,
+                ]);
+            }
+
+            if ($isValid) {
+                $score += $question->score;
+            }
+        }
+
+        $attempt->update(['score' => $score]);
+
+        return response()->view(
+            'web.default.panel.quiz.child.result',
+            [
+                'quiz' => $quiz,
+                'attempt' => $attempt,
+                'submissions' => $attempt->submissions()->with('question', 'question.answers')->get(),
+            ],
+            200,
+        );
+    }
+    public function storeAttempt(Request $request, $quiz_id)
+    {
+        $quiz = Quiz::with('questions.answers')->findOrFail($quiz_id);
+        $childId = auth()->id();
+        $submittedAnswers = $request->input('answers', []);
+
+        $score = 0;
+        $score_total = $quiz->questions->sum('score');
+
+        $attempt = QuizAttemptScore::create([
+            'quiz_id' => $quiz->id,
+            'child_id' => $childId,
+            'score' => 0,
+            'score_total' => $score_total,
+            'submitted_at' => now(),
+        ]);
+
+        foreach ($quiz->questions as $question) {
+            $qId = $question->id;
+            $userAnswer = $submittedAnswers[$qId] ?? null;
+
+            if ($question->type === 'qcm' && $userAnswer) {
+                $answer = Answer::find($userAnswer);
+                $isCorrect = $answer?->is_valid == 1;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => $answer?->id,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            } elseif ($question->type === 'binaire' && $userAnswer !== null) {
+                $expected = $question->is_valid ? 'true' : 'false';
+                $isCorrect = $userAnswer === $expected;
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'is_boolean_question' => true,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            } elseif ($question->type === 'arrow' && is_array($userAnswer)) {
+                $correctPairs = $question->answers
+                    ->mapWithKeys(function ($a) {
+                        return [$a->answer_text => $a->matching];
+                    })
+                    ->toArray();
+
+                $isCorrect = true;
+                foreach ($correctPairs as $source => $target) {
+                    if (($userAnswer[$source] ?? null) !== $target) {
+                        $isCorrect = false;
+                        break;
+                    }
+                }
+
+                QuizSubmissions::create([
+                    'quiz_id' => $quiz->id,
+                    'child_id' => $childId,
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $qId,
+                    'answer_id' => null,
+                    'is_valid' => $isCorrect,
+                    'arrow_mapping' => $userAnswer,
+                    'is_boolean_question' => false,
+                ]);
+
+                if ($isCorrect) {
+                    $score += $question->score;
+                }
+            }
+        }
+
+        $attempt->update(['score' => $score]);
+
+        //  Récupération des réponses pour l'affichage
+        $submissions = QuizSubmissions::with('question', 'answer')->where('attempt_id', $attempt->id)->get();
+
+        return view('web.default.panel.quiz.child.result', [
+            'quiz' => $quiz,
+            'attempt' => $attempt,
+            'submissions' => $submissions,
+        ]);
+    }
+    /**
+     * Get the last attempt of the child and display the result.
+     */
+    public function getLastAttemptResult($quiz_id)
+    {
+        $childId = auth()->id();
+
+        $quiz = Quiz::with('questions.answers')->findOrFail($quiz_id);
+
+        $lastAttempt = QuizAttemptScore::where('quiz_id', $quiz_id)->where('child_id', $childId)->orderByDesc('attempt_number')->first();
+
+        if (!$lastAttempt) {
+            return response()->json(['message' => 'No attempt found.'], 404);
+        }
+
+        $submissions = QuizSubmissions::with('question.answers')->where('attempt_id', $lastAttempt->id)->get();
+
+        return response()->view(
+            'web.default.panel.quiz.child.result',
+            [
+                'quiz' => $quiz,
+                'attempt' => $lastAttempt,
+                'submissions' => $submissions,
+            ],
+            200,
+        );
     }
 }

@@ -10,7 +10,8 @@
                         <h6 class="text-muted">كل الاختبارات التي قمت بإنشائها</h6>
                     </div>
 
-                    <div class="col-12 col-md-9 d-flex p-2 justify-content-center align-items-center" style="flex-wrap: wrap;gap:3px">
+                    <div class="col-12 col-md-9 d-flex p-2 justify-content-center align-items-center"
+                        style="flex-wrap: wrap;gap:3px">
 
                         <input type="text" name="search" id="searchInput" class="filter-input ml-2"
                             placeholder="🔍 ابحث عن تحدي بالعنوان">
@@ -46,10 +47,7 @@
 
 
 
-            {{-- Pagination --}}
-            {{-- <div class="d-flex justify-content-center align-items-center m-auto ">
-                {{ $quizzes->links('vendor.pagination.custom') }}
-            </div> --}}
+            {{-- La pagination est gu00e9ru00e9e dans le fichier partials/quizzes.blade.php --}}
 
             {{-- Floating Button --}}
             <a href="{{ route('panel.teacher.quiz.index') }}" class="btn btn-primary rounded-circle position-fixed"
@@ -68,8 +66,50 @@
 
 
             function loadQuizzes(url = null) {
-                const query = searchInput.value;
-                const fetchUrl = url || `{{ route('panel.quiz.drafts') }}?search=${encodeURIComponent(query)}`;
+                // Récupérer tous les paramètres de filtrage directement des éléments du DOM
+                const searchInput = document.getElementById('searchInput');
+                const statuesFilter = document.getElementById('filterStatues');
+                const levelFilter = document.getElementById('filterLevel');
+                const materialFilter = document.getElementById('filterMaterial');
+                
+                // Si nous utilisons une URL fournie (comme pour la pagination),
+                // il faut extraire les paramètres existants pour les préserver
+                let params;
+                if (url) {
+                    // Analyser l'URL fournie pour extraire les paramètres existants
+                    const urlObj = new URL(url, window.location.origin);
+                    params = new URLSearchParams(urlObj.search);
+                    
+                    // Afficher les paramètres extraits pour débogage
+                    console.log('Paramètres extraits de l\'URL:', Object.fromEntries(params.entries()));
+                } else {
+                    // Construire de nouveaux paramètres bassés sur les filtres actuels
+                    params = new URLSearchParams();
+                    
+                    const query = searchInput ? searchInput.value : '';
+                    const status = statuesFilter ? statuesFilter.value : '';
+                    const level = levelFilter ? levelFilter.value : '';
+                    const material = materialFilter ? materialFilter.value : '';
+                    
+                    // Ajouter les paramètres seulement s'ils ont une valeur
+                    if (query) params.append('search', query);
+                    if (status) params.append('status', status);
+                    if (level) params.append('level', level);
+                    if (material) params.append('material', material);
+                    
+                    // Débogage: afficher les valeurs des filtres dans la console
+                    console.log({
+                        'Recherche': query,
+                        'Statut': status,
+                        'Niveau': level,
+                        'Matière': material
+                    });
+                }
+                
+                // Construire l'URL finale
+                const fetchUrl = url || `{{ route('panel.quiz.drafts') }}?${params.toString()}`;
+                
+                console.log('URL de chargement finale:', fetchUrl); // Aide au débogage
 
                 fetch(fetchUrl, {
                         headers: {
@@ -79,23 +119,24 @@
                     .then(res => res.text())
                     .then(html => {
                         document.getElementById('quizWrapper').innerHTML = html;
-
-                        attachPaginationLinks(); 
-                        applyFilters(); 
+                        // Attacher les écouteurs de pagination après avoir chargé le nouveau contenu
+                        attachPaginationLinks();
                     })
                     .catch(err => console.error("Erreur AJAX :", err));
             }
 
-            // Recherche instantanée
-            searchInput.addEventListener('input', function() {
-                loadQuizzes(); // recharge les quiz avec le texte de recherche
-            });
+            // La recherche instantanée est gérée dans la fonction setupEventListeners
 
-            // 🔁 Fonction pour intercepter les clics pagination
+            //  Fonction pour intercepter les clics pagination - version améliorée sans duplication d'écouteurs
             function attachPaginationLinks() {
                 const links = quizWrapper.querySelectorAll('.pagination a');
                 links.forEach(link => {
-                    link.addEventListener('click', function(e) {
+                    // Supprimer les écouteurs précédents en clonant et remplaçant l'élément
+                    const newLink = link.cloneNode(true);
+                    link.parentNode.replaceChild(newLink, link);
+                    
+                    // Ajouter le nouvel écouteur
+                    newLink.addEventListener('click', function(e) {
                         e.preventDefault();
                         const url = this.getAttribute('href');
                         if (url) {
@@ -104,14 +145,15 @@
                     });
                 });
             }
-
+            
             // Initialiser au chargement
-            attachPaginationLinks();
+            document.addEventListener('DOMContentLoaded', function() {
+                attachPaginationLinks();
+            });
         </script>
 
 
         <style>
-            /* 🧼 Container global (optionnel) */
             .filter-bar {
                 background-color: #ffffff;
                 box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -119,7 +161,7 @@
 
             }
 
-            /* 🎛️ Style unifié pour les <select> et <input> */
+            /*  Style unifié pour les <select> et <input> */
             .filter-select,
             .filter-input {
                 background-color: #f4f8fc;
@@ -135,7 +177,7 @@
                 transition: all 0.2s ease-in-out;
             }
 
-            /* 🧲 Au focus : border et halo */
+            /* Au focus : border et halo */
             .filter-select:focus,
             .filter-input:focus {
                 outline: none;
@@ -143,7 +185,7 @@
                 box-shadow: 0 0 0 2px rgba(16, 69, 104, 0.2);
             }
 
-            /* 📲 Responsive comportement (wrap automatique) */
+            /*  Responsive comportement (wrap automatique) */
 
 
             .quiz-status-badge {
@@ -175,6 +217,13 @@
                 color: #fff;
             }
 
+            .dropdown-menu {
+                z-index: 5000 !important;
+                border-radius: 12px;
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+                padding: 8px 0;
+            }
+
             .dropdown-menu .dropdown-item {
                 font-size: 15px;
                 padding: 10px 15px;
@@ -184,6 +233,7 @@
             .dropdown-menu .dropdown-item:last-child {
                 border-bottom: none;
             }
+
 
             .custom-select-style {
                 border: 1px solid #ccc;
@@ -223,8 +273,8 @@
             }
 
             .quiz-card:hover {
-                transform: scale(1.03);
                 box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+                
             }
 
             .bg-lightblue {
@@ -249,7 +299,7 @@
             }
         </style>
 
-        {{-- ✏️ JS: Inline Editing & Filtering --}}
+        {{-- JS: Inline Editing & Filtering --}}
         <script>
             function enableTitleEdit(element) {
                 const quizId = element.dataset.id;
@@ -300,36 +350,61 @@
                 }
             }
 
-            // 🔍 Client-side filtering
-            const levelFilter = document.getElementById('filterLevel');
-            const materialFilter = document.getElementById('filterMaterial');
-            const cards = document.querySelectorAll('.quiz-card-wrapper');
-
-            function applyFilters() {
-                const selectedLevel = levelFilter.value;
-                const selectedMaterial = materialFilter.value;
-                const selectedStatues = statuesFilter.value;
-                const query = searchInput.value.trim().toLowerCase();
-
-                cards.forEach(card => {
-                    const level = card.getAttribute('data-level') || '';
-                    const material = card.getAttribute('data-material') || '';
-                    const statues = card.getAttribute('data-statues') || '';
-                    const title = card.querySelector('.quiz-title')?.textContent?.toLowerCase() || '';
-
-                    const match =
-                        (!selectedLevel || level === selectedLevel) &&
-                        (!selectedMaterial || material === selectedMaterial) &&
-                        (!selectedStatues || statues === selectedStatues) &&
-                        (!query || title.includes(query));
-
-                    card.style.display = match ? '' : 'none';
-                });
+            // Fonction pour attacher les écouteurs d'événements sans conflit
+            function setupEventListeners() {
+                // Au lieu de cloner et remplacer, nous allons simplement attacher les écouteurs directement
+                // mais en nous assurant d'utiliser la même fonction de callback pour tous
+                
+                const levelFilter = document.getElementById('filterLevel');
+                const materialFilter = document.getElementById('filterMaterial');
+                const statuesFilter = document.getElementById('filterStatues');
+                const searchInput = document.getElementById('searchInput');
+                
+                // Vérifier que tous les éléments existent avant d'attacher les écouteurs
+                if (levelFilter) {
+                    levelFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (materialFilter) {
+                    materialFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (statuesFilter) {
+                    statuesFilter.addEventListener('change', triggerLoadQuizzes);
+                }
+                
+                if (searchInput) {
+                    searchInput.addEventListener('input', triggerLoadQuizzes);
+                }
             }
-
-
-            levelFilter.addEventListener('change', applyFilters);
-            materialFilter.addEventListener('change', applyFilters);
-            statuesFilter.addEventListener('change', applyFilters);
+            
+            // Fonction de callback commune pour tous les écouteurs pour éviter les conflits
+            function triggerLoadQuizzes() {
+                loadQuizzes();
+            }
+            
+            // Configurer les écouteurs au chargement initial de la page
+            document.addEventListener('DOMContentLoaded', function() {
+                setupEventListeners();
+                attachPaginationLinks();
+            });
         </script>
+        @if(session('success'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            Swal.fire({
+                icon: 'success',
+                title: 'نجاح',
+                text: '{{ session('success') }}',
+                toast: true,
+                position: 'bottom-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        });
+    </script>
+@endif
+
+
     @endsection

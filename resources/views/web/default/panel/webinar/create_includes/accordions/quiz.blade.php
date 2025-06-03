@@ -1,51 +1,91 @@
-    <li data-id="{{ !empty($chapterItem) ? $chapterItem->id :'' }}" class="accordion-row bg-white rounded-sm border border-gray300 mt-20 py-15 py-lg-30 px-10 px-lg-20">
-        <div class="d-flex align-items-center justify-content-between " role="tab" id="quiz_{{ !empty($quizInfo) ? $quizInfo->id :'record' }}">
-            <div class="d-flex align-items-center" href="#collapseQuiz{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" aria-controls="collapseQuiz{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" data-parent="#{{ !empty($chapter) ? 'chapterContentAccordion'.$chapter->id : 'quizzesAccordion' }}" role="button" data-toggle="collapse" aria-expanded="true">
-                <span class="chapter-icon chapter-content-icon mr-10">
-                    <i data-feather="award" class=""></i>
-                </span>
+@php
+    $colors = [
+        'العربية' => '#FFB3BA',
+        'رياضيات' => '#8EACCD',
+        'الإيقاظ العلمي' => '#A0937D',
+        'الفرنسية' => '#A6B37D',
+        'المواد الاجتماعية' => '#F6D7A7',
+        'الإنجليزية' => '#BAABDA',
+    ];
 
-                <span class="font-weight-bold text-dark-blue d-block">{{ !empty($quizInfo) ? $quizInfo->title : trans('public.add_new_quizzes') }}</span>
+    $materialName = $quizInfo->material->name ?? 'بدون مادة';
+    $levelName = $quizInfo->level->name ?? 'بدون مستوى';
+    $materialColor = $colors[$materialName] ?? '#ffc107';
+@endphp
+
+<div class="col-12 mb-3 quiz-card-wrapper" data-level="{{ $levelName }}" data-material="{{ $materialName }}">
+
+    <div class="card rounded-4 shadow-sm border d-flex flex-row align-items-center justify-content-between p-3"
+        style="cursor: pointer; border-color: #eee; transition: 0.3s ease;">
+
+        {{-- LEFT SIDE (icon + title + info) --}}
+        <div class="d-flex align-items-center" style="gap: 20px;"
+        onclick="window.location.href='{{ route('panel.quiz.edit', $quizInfo->id) }}'">
+
+            {{-- Icon --}}
+            <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary text-white"
+                style="width: 50px; height: 50px; font-size: 22px;">
+                🎲
             </div>
 
-            <div class="d-flex align-items-center">
+            {{-- Info --}}
+            <div>
+                {{-- Title --}}
+                <h5 class="fw-bold text-dark mb-2" style="font-size: 18px;" onclick="event.stopPropagation();">
+                    {{ $quizInfo->title ?: 'تحدي جديد' }}
+                </h5>
 
-                @if(!empty($quizInfo) and $quizInfo->status != \App\Models\WebinarChapter::$chapterActive)
-                    <span class="disabled-content-badge mr-10">{{ trans('public.disabled') }}</span>
-                @endif
+                {{-- Questions count --}}
+                <small class="text-muted d-block mb-2">عدد الأسئلة: {{ $quizInfo->questions->count() ?? 0 }}</small>
 
-                @if(!empty($quizInfo) and !empty($chapterItem))
-                    <button type="button" data-item-id="{{ $quizInfo->id }}" data-item-type="{{ \App\Models\WebinarChapterItem::$chapterQuiz }}" data-chapter-id="{{ !empty($chapter) ? $chapter->id : '' }}" class="js-change-content-chapter btn btn-sm btn-transparent text-gray mr-10">
-                        <i data-feather="grid" class="" height="20"></i>
-                    </button>
-                @endif
-
-                @if(!empty($chapter))
-                    <i data-feather="move" class="move-icon mr-10 cursor-pointer" height="20"></i>
-                @endif
-
-                @if(!empty($quizInfo))
-                    <a href="/panel/quizzes/{{ $quizInfo->id }}/delete" class="delete-action btn btn-sm btn-transparent text-gray">
-                        <i data-feather="trash-2" class="mr-10 cursor-pointer" height="20"></i>
-                    </a>
-                @endif
-
-                <i class="collapse-chevron-icon" data-feather="chevron-down" height="20" href="#collapseQuiz{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" aria-controls="collapseQuiz{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" data-parent="#quizzesAccordion" role="button" data-toggle="collapse" aria-expanded="true"></i>
+                {{-- Level + Material --}}
+                <div class="d-flex align-items-center" style="gap: 7px;">
+                    <span class="badge text-dark" style="background-color: {{ $materialColor }};">
+                        {{ $materialName }}
+                    </span>
+                    <span class="badge bg-light border">
+                        {{ $levelName }}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <div id="collapseQuiz{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" aria-labelledby="quiz_{{ !empty($quizInfo) ? $quizInfo->id :'record' }}" class=" collapse @if(empty($quizInfo)) show @endif" role="tabpanel">
-            <div class="panel-collapse text-gray">
-                @include('web.default.panel.quizzes.create_quiz_form',
-                        [
-                            'inWebinarPage' => true,
-                            'selectedWebinar' => $webinar,
-                            'quiz' => $quizInfo ?? null,
-                            'quizQuestions' => !empty($quizInfo) ? $quizInfo->quizQuestions : [],
-                            'chapters' => $webinar->chapters,
-                            'webinarChapterPages' => !empty($webinarChapterPages)
-                        ]
-                    )
-            </div>
+        {{-- RIGHT SIDE (status + delete) --}}
+        <div class="d-flex flex-column align-items-end" style="gap: 10px;">
+            {{-- Delete Button --}}
+            <form id="deleteQuizForm{{ $quizInfo->id }}" action="{{ route('panel.quiz.delete') }}" method="POST"
+                style="display:none;">
+                @csrf
+                <input type="hidden" name="quiz_id" value="{{ $quizInfo->id }}">
+            </form>
+
+            <button type="button"
+                class="btn btn-sm btn-danger rounded-pill d-flex align-items-center justify-content-center px-3 py-1"
+                onclick="confirmDelete({{ $quizInfo->id }})">
+                <i data-feather="trash-2" style="width: 14px; height: 14px; margin-left: 5px;"></i> حذف التحدي
+            </button>
         </div>
-    </li>
+
+        
+
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function confirmDelete(quizId) {
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: "هل أنت متأكد من حذف التحدي؟",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'نعم، احذفه!',
+            cancelButtonText: 'إلغاء'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('deleteQuizForm' + quizId).submit();
+            }
+        })
+    }
+</script>
