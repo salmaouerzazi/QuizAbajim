@@ -74,12 +74,99 @@
     </div>
 
 </div>
-@foreach ($item->chapter->quiz as $quiz)
+{{-- @foreach ($item->chapter->quiz as $quiz)
     <a href="{{ route('panel.quiz.do', $quiz->id) }}" class="d-flex align-items-start p-10 cursor-pointer text-decoration-none">
         <span class="chapter-icon bg-gray300 mr-10">
             <i data-feather="file-text" class="text-gray" width="16" height="16"></i>
         </span>
         <span class="font-12 text-dark-blue d-block">{{ $quiz->title }}</span>
     </a>
+@endforeach --}}
+{{-- @foreach ($item->chapter->quiz as $quiz)
+    <div class="d-flex align-items-start p-10 cursor-pointer {{ (!empty($checkSequenceContent) and $sequenceContentHasError) ? 'js-sequence-content-error-modal' : 'tab-item' }}"
+         data-type="quiz"
+         data-id="{{ $quiz->id }}"
+         data-passed-error="{{ !empty($checkSequenceContent['all_passed_items_error']) ? $checkSequenceContent['all_passed_items_error'] : '' }}"
+         data-access-days-error="{{ !empty($checkSequenceContent['access_after_day_error']) ? $checkSequenceContent['access_after_day_error'] : '' }}">
+
+        <span class="chapter-icon bg-gray300 mr-10">
+            <i data-feather="file-text" class="text-gray" width="16" height="16"></i>
+        </span>
+
+        <div>
+            <span class="font-weight-500 font-14 text-dark-blue d-block">{{ $quiz->title }}</span>
+            <span class="font-12 text-gray d-block">{{ $quiz->description ? truncate($quiz->description, 150) : '' }}</span>
+        </div>
+    </div>
+@endforeach --}}
+@foreach ($item->chapter->quiz as $quiz)
+    @php
+        $lastAttempt = \App\Models\QuizAttemptScore::where('quiz_id', $quiz->id)
+            ->where('child_id', auth()->id())
+            ->latest('attempt_number')
+            ->first();
+        if ($lastAttempt) {
+            $score = $lastAttempt->score;
+            $total = $lastAttempt->score_total;
+            $noteSur20 = round(($score / $total) * 20, 2);
+            $pourcentage = round(($score / $total) * 100);
+            $badgeColor = $pourcentage >= 80 ? 'success' : ($pourcentage >= 50 ? 'warning' : 'danger');
+        }
+    @endphp
+    <div class="d-flex align-items-start justify-content-between p-10 cursor-pointer {{ (!empty($checkSequenceContent) and $sequenceContentHasError) ? 'js-sequence-content-error-modal' : 'tab-item' }}"
+        data-type="quiz" data-id="{{ $quiz->id }}"
+        data-passed-error="{{ !empty($checkSequenceContent['all_passed_items_error']) ? $checkSequenceContent['all_passed_items_error'] : '' }}"
+        data-access-days-error="{{ !empty($checkSequenceContent['access_after_day_error']) ? $checkSequenceContent['access_after_day_error'] : '' }}">
+
+        <div class="d-flex align-items-start">
+            <span class="chapter-icon bg-gray300 mr-10">
+                <i data-feather="file-text" class="text-gray" width="16" height="16"></i>
+            </span>
+
+            <div>
+                <span class="font-weight-500 font-14 text-dark-blue d-block">{{ $quiz->title }}</span>
+                <span
+                    class="font-12 text-gray d-block">{{ $quiz->description ? truncate($quiz->description, 150) : '' }}</span>
+            </div>
+        </div>
+        @if ($lastAttempt)
+            <div class="d-flex align-items-center">
+                <span class="badge badge-{{ $badgeColor }} font-12">
+                    {{ $pourcentage }}%
+                </span>
+                <button type="button" class="btn btn-sm btn-primary ml-auto"
+                    onclick="event.stopPropagation(); event.preventDefault();
+                fetchLastAttempt({{ $quiz->id }})">
+                    عرض النتيجة
+                </button>
+            </div>
+        @endif
+    </div>
 @endforeach
 
+<div class="modal fade" id="resultModal" tabindex="-1" role="dialog" aria-labelledby="resultModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content" id="modalResultContent">
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    function fetchLastAttempt(quizId) {
+        fetch(`/panel/child/quiz/${quizId}/last-attempt`)
+            .then(response => {
+                if (!response.ok) throw new Error('لم يتم العثور على محاولة سابقة.');
+                return response.text();
+            })
+            .then(html => {
+                document.getElementById('modalResultContent').innerHTML = html;
+                const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+                modal.show();
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+    }
+</script>

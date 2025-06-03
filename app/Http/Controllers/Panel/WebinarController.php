@@ -505,7 +505,22 @@ class WebinarController extends Controller
         $selectedMaterial = Material::with('submaterials')->find($webinar->material_id);
         $submaterials = $selectedMaterial ? $selectedMaterial->submaterials : [];
 
-        $quizzes = Quiz::where('model_id', '==', 0)->orWhereNull('model_id')->get();
+        // Filtrage des quiz par niveau et matière du webinar
+        $quizzesQuery = Quiz::where(function($query) {
+            $query->where('model_id', '==', 0)->orWhereNull('model_id');
+        });
+        
+        // Filtrer par niveau si disponible
+        if (!empty($webinar->level_id)) {
+            $quizzesQuery->where('level_id', $webinar->level_id);
+        }
+        
+        // Filtrer par matière si disponible
+        if (!empty($webinar->material_id)) {
+            $quizzesQuery->where('material_id', $webinar->material_id);
+        }
+        
+        $quizzes = $quizzesQuery->get();
         $quizmodel = Quiz::where('model_id', '!=', 0)->get();
 
         $data = [

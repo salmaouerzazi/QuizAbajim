@@ -13,7 +13,6 @@
 
 <div class="learning-content" id="learningPageContent">
 
-
     @if (!empty($isForumAnswersPage) and $isForumAnswersPage)
         @include('web.default.course.learningPage.components.forum.forum_answers')
     @elseif(!empty($isForumPage) and $isForumPage)
@@ -22,6 +21,8 @@
         @include('web.default.course.learningPage.components.noticeboards')
     @elseif(!empty($assignment))
         @include('web.default.course.learningPage.components.assignment')
+    @elseif(!empty($quizzes) and $quizzes)
+        @include('web.default.panel.quiz.child.doQuiz')
     @endif
 
     <div

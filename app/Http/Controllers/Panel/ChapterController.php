@@ -28,8 +28,73 @@ class ChapterController extends Controller
         $chapter = WebinarChapter::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
-        $quiz =Quiz::where('model_id', $chapter->id)
+        
+        // Récupérer le webinar associé au chapitre pour obtenir le niveau et la matière
+        $webinar = $chapter->webinar;
+        
+        // Débogage - Vérifier les valeurs des champs webinar
+        $debug = [
+            'webinar_id' => $webinar->id,
+            'webinar_title' => $webinar->title,
+            'level_id' => $webinar->level_id,
+            'material_id' => $webinar->material_id,
+            'chapter_id' => $chapter->id
+        ];
+        
+        // Filtrer les quiz déjà assignés à ce chapitre
+        $assignedQuiz = Quiz::where('model_id', $chapter->id)
             ->get();
+            
+        // Filtrer les quiz non assignés selon le niveau et la matière du webinar
+        $availableQuizzes = Quiz::where('status', 'draft')
+            ->where(function ($query) use ($chapter) {
+                $query->whereNull('model_id')
+                    ->orWhere('model_id', '!=', $chapter->id);
+            })
+            ->where('teacher_id', $user->id);
+            
+        // Appliquer le filtrage par niveau et matière si ces données sont disponibles dans le webinar
+        if (!empty($webinar->level_id)) {
+            $availableQuizzes->where('level_id', $webinar->level_id);
+        }
+        
+        // Utiliser material_id pour la matière dans les deux modèles
+        if (!empty($webinar->material_id)) {
+            $availableQuizzes->where('material_id', $webinar->material_id);
+        }
+        
+        // Avant d'exécuter la requête, récupérons tous les quiz pour débogage
+        $allQuizzes = Quiz::where('status', 'draft')
+            ->where('teacher_id', $user->id)
+            ->get();
+            
+        // Tableau pour débogage - Tous les quiz
+        $quizDebug = [];
+        foreach ($allQuizzes as $quiz) {
+            $quizDebug[] = [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'level_id' => $quiz->level_id,
+                'material_id' => $quiz->material_id,
+                'webinar_level_id' => $webinar->level_id,
+                'webinar_material_id' => $webinar->material_id,
+                'level_match' => ($quiz->level_id == $webinar->level_id),
+                'material_match' => ($quiz->material_id == $webinar->material_id),
+                'would_be_filtered' => ($quiz->level_id == $webinar->level_id && $quiz->material_id == $webinar->material_id)
+            ];
+        }
+        
+        // Enregistrer les résultats de débogage dans le fichier de log
+        \Log::info('Debug Webinar et Quiz filtering', [
+            'webinar' => $debug,
+            'quizzes' => $quizDebug
+        ]);
+        
+        $availableQuizzes = $availableQuizzes->get();
+        
+        // Combiner les quizzes disponibles avec les quizzes déjà assignés
+        $quizzes = $availableQuizzes->merge($assignedQuiz);
+        
         $locale = $request->get('locale', app()->getLocale());
 
         if (!empty($chapter)) {
@@ -43,7 +108,10 @@ class ChapterController extends Controller
 
             $data = [
                 'chapter' => $chapter,
-                'quiz' => $quiz,
+                'quiz' => $assignedQuiz,  // Quiz déjà assignés au chapitre
+                'quizzes' => $quizzes,    // Tous les quiz disponibles pour l'assignation
+                'debug' => $debug,        // Informations sur le webinar
+                'quizDebug' => $quizDebug // Informations sur tous les quiz
             ];
 
             return response()->json($data, 200);

@@ -7,6 +7,8 @@ return [
   | General Translations
   |--------------------------------------------------------------------------
   */
+  'no_available_quizzes' => 'لا توجد اختبارات متاحة',
+  'only_quizzes_with_same_level_and_subject' => 'تظهر فقط الاختبارات التي تطابق نفس المستوى والمادة للفصل',
   'chapters' => 'الدروس',
   'optional' => 'الخيارات',
   'new_chapter' => 'محور جديد',

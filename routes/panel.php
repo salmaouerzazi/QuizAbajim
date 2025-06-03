@@ -27,7 +27,9 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
     Route::group(['middleware' => ['checkrole:enfant']], function () {
         Route::get('/enfant/concours', [ConcoursController::class, 'getConcoursByLevelEnfant']);
         Route::get('/enfant/concours/{id}', [ConcoursController::class, 'getConcoursBookAndInsertIconPlay']);
-        Route::post('/quizzes/submit/{id}', 'QuizController@submitFromChild')->name('panel.quiz.submit');
+        Route::post('/quizzes/{id}/submit-child', 'QuizController@submitFromChild')->name('panel.quiz.submit');
+        Route::get('/child/quiz/{quiz_id}/last-attempt', 'QuizController@getLastAttemptResult')->name('quiz.lastAttempt');
+
 
         //-------------------------------------------------------------------------
 
@@ -118,6 +120,9 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
             Route::get('/{id}/saveStatus', 'NotificationsController@saveStatus');
             Route::post('/mark-all-read', 'NotificationsController@markAllRead')->name('panel.notifications.markAllRead');
         });
+        
+        // Route pour le filtrage des quiz (nécessaire pour le modal d'assignation de quiz)
+        Route::get('/filtered-quizzes/{chapterId}', 'FilteredQuizController@getFilteredQuizzes')->name('panel.quiz.filtered');
         Route::group(['prefix' => 'webinars'], function () {
             Route::get('/', 'WebinarController@index');
             Route::get('/new', 'WebinarController@create');
@@ -134,7 +139,7 @@ Route::group(['namespace' => 'Panel', 'prefix' => 'panel', 'middleware' => ['che
             });
         });
         Route::group(['prefix' => 'chapters'], function () {
-            Route::get('/{id}', 'ChapterController@getChapter');
+            Route::get('/{id}', 'ChapterController@getChapter')->name('panel.chapters.getChapter');
             Route::get('/getAllByWebinarId/{webinar_id}', 'ChapterController@getAllByWebinarId');
             Route::post('/store', 'ChapterController@store');
             Route::post('/{id}/update', 'ChapterController@update');
